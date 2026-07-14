@@ -1,1 +1,2 @@
-# No exclusions — CSVs are committed so GitHub Pages can serve live data
+# Token file - never commit this
+.github_token
