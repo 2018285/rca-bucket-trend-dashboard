@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCA Bucket Trend Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #222539;
+    --border: #2d3055;
+    --text: #e2e8f0;
+    --muted: #8892b0;
+    --primary: #4f8ef7;
+    --accent: #7c3aed;
+    --danger: #ef4444;
+    --success: #10b981;
+    --warning: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* Loading */
+  #loading-overlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  }
+  .spinner {
+    width: 48px; height: 48px; border: 4px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%; animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #load-text { color: var(--muted); font-size: 15px; }
+  #progress-bar-wrap { width: 300px; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  #progress-bar-fill { height: 100%; background: var(--primary); border-radius: 99px; width: 0%; transition: width 0.3s; }
+
+  /* App */
+  #app { display: none; padding: 16px; max-width: 1800px; margin: 0 auto; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .header h1 span { color: var(--primary); }
+  .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #3b7de8; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--surface2); }
+  .header-actions { display: flex; gap: 8px; }
+
+  /* Filters */
+  .filters-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 16px;
+    display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; min-width: 160px; flex: 1; }
+  .filter-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .filter-group.wide { min-width: 220px; flex: 2; }
+  .filter-actions { display: flex; gap: 8px; align-items: flex-end; }
+
+  /* Tom Select overrides */
+  .ts-wrapper { --ts-input-background: var(--surface2); }
+  .ts-control { background: var(--surface2) !important; border: 1px solid var(--border) !important; color: var(--text) !important; border-radius: 8px !important; padding: 6px 10px !important; min-height: 36px !important; }
+  .ts-control input { color: var(--text) !important; }
+  .ts-dropdown { background: var(--surface2) !important; border: 1px solid var(--border) !important; color: var(--text) !important; border-radius: 8px !important; }
+  .ts-dropdown .option:hover, .ts-dropdown .option.active { background: var(--border) !important; }
+  .ts-dropdown .option.selected { background: var(--primary) !important; color: #fff !important; }
+  .ts-control .item { background: var(--primary) !important; color: #fff !important; border-radius: 4px !important; padding: 2px 8px !important; font-size: 12px !important; }
+  .ts-control .item .remove { color: rgba(255,255,255,0.7) !important; }
+
+  /* KPI Row */
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; display: flex; flex-direction: column; gap: 6px;
+    border-left: 3px solid var(--primary);
+  }
+  .kpi-card.danger { border-left-color: var(--danger); }
+  .kpi-card.success { border-left-color: var(--success); }
+  .kpi-card.warning { border-left-color: var(--warning); }
+  .kpi-card.accent { border-left-color: var(--accent); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: #fff; line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--muted); }
+
+  /* Charts Grid */
+  .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .charts-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .chart-title .badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 99px; color: var(--muted); font-weight: 400; }
+  .chart-canvas-wrap { position: relative; }
+
+  /* Heatmap */
+  .heatmap-scroll { overflow: auto; max-height: 380px; }
+  .heatmap-table { border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+  .heatmap-table th { position: sticky; background: var(--surface2); color: var(--muted); font-weight: 600; padding: 5px 8px; border: 1px solid var(--border); font-size: 11px; z-index: 2; }
+  .heatmap-table th.city-col { left: 0; z-index: 3; min-width: 120px; text-align: left; }
+  .heatmap-table td { padding: 4px 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center; font-size: 11px; font-weight: 500; cursor: default; }
+  .heatmap-table td.city-col { position: sticky; left: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 12px; z-index: 1; }
+  .heatmap-table tr:hover td { filter: brightness(1.2); }
+
+  /* Table */
+  .table-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .table-info { font-size: 12px; color: var(--muted); }
+  .table-scroll { overflow: auto; max-height: 380px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 10px 12px; border-bottom: 2px solid var(--border); cursor: pointer; user-select: none;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.4; }
+  thead th.sorted .sort-icon { opacity: 1; color: var(--primary); }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 9px 12px; color: var(--text); }
+  .bucket-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .rate-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .rate-high { background: rgba(239,68,68,0.15); color: #f87171; }
+  .rate-med  { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .rate-low  { background: rgba(16,185,129,0.15); color: #34d399; }
+
+  /* Pagination */
+  .pagination { display: flex; gap: 4px; }
+  .page-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-size: 12px; }
+  .page-btn:hover { background: var(--surface2); }
+  .page-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* Shared pivot/summary table styles */
+  .pivot-table, .summary-table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
+  .pivot-table th, .summary-table th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 16px; border: 1px solid var(--border); text-align: center; z-index: 2;
+  }
+  .pivot-table th.week-col, .summary-table th.row-hdr { left: 0; z-index: 3; text-align: left; min-width: 130px; }
+  .pivot-table td, .summary-table td { padding: 8px 14px; border: 1px solid rgba(255,255,255,0.05); text-align: center; vertical-align: middle; }
+  .pivot-table td.week-col {
+    position: sticky; left: 0; background: var(--surface); color: var(--text);
+    font-weight: 700; text-align: left; font-size: 13px; z-index: 1; min-width: 72px;
+  }
+  .summary-table td.row-hdr {
+    position: sticky; left: 0; background: var(--surface); color: var(--text);
+    font-weight: 600; text-align: left; font-size: 13px; z-index: 1; min-width: 130px;
+  }
+  .pivot-table tbody tr:hover td, .summary-table tbody tr:hover td { background: rgba(255,255,255,0.04); }
+  .pivot-table tbody tr:hover td.week-col, .summary-table tbody tr:hover td.row-hdr { background: var(--surface2); }
+  .pivot-table tfoot td {
+    background: var(--surface2); font-weight: 700;
+    border-top: 2px solid var(--border); padding: 10px 16px;
+  }
+  .pivot-table tfoot td.week-col { position: sticky; left: 0; background: var(--surface2); z-index: 1; color: #fff; font-size: 13px; }
+  .pivot-cell-igcc { font-weight: 700; font-size: 14px; line-height: 1.2; }
+  .pivot-cell-rate { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* Footer */
+  .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 16px 0; border-top: 1px solid var(--border); }
+
+  @media (max-width: 1200px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; }
+    .charts-grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 768px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid-3, .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div id="load-text">Loading CSV data...</div>
+  <div id="progress-bar-wrap"><div id="progress-bar-fill"></div></div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <div class="header">
+    <div>
+      <h1>RCA Bucket <span>Trend Dashboard</span></h1>
+      <div class="header-sub" id="data-summary">Loading...</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline" id="reset-btn">Reset Filters</button>
+      <button class="btn btn-primary" id="download-btn">⬇ Download CSV</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filter-group">
+      <label>Week</label>
+      <select id="filter-week" multiple placeholder="All Weeks"></select>
+    </div>
+    <div class="filter-group wide">
+      <label>City</label>
+      <select id="filter-city" multiple placeholder="All Cities"></select>
+    </div>
+    <div class="filter-group">
+      <label>SPOC</label>
+      <select id="filter-spoc" multiple placeholder="All SPOCs"></select>
+    </div>
+    <div class="filter-group wide">
+      <label>RCA Bucket</label>
+      <select id="filter-bucket" multiple placeholder="All Buckets"></select>
+    </div>
+  </div>
+
+  <!-- City × SPOC Summary Table -->
+  <div class="table-section" style="margin-bottom:16px;">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        City × SPOC Bucketing Summary
+        <span class="badge" id="summary-badge">—</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="table-info" id="summary-info"></span>
+        <button class="btn btn-outline" id="download-summary-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:340px;margin-top:12px;">
+      <div id="summary-container"></div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">UNIC Orders</div>
+      <div class="kpi-value" id="kpi-orders">—</div>
+      <div class="kpi-sub" id="kpi-orders-sub">—</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kpi-label">Total IGCC</div>
+      <div class="kpi-value" id="kpi-igcc">—</div>
+      <div class="kpi-sub" id="kpi-igcc-sub">—</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-label">IGCC Rate %</div>
+      <div class="kpi-value" id="kpi-rate">—</div>
+      <div class="kpi-sub">IGCC / UNIC Orders</div>
+    </div>
+    <div class="kpi-card success">
+      <div class="kpi-label">Top City (by rate)</div>
+      <div class="kpi-value" id="kpi-city" style="font-size:18px;">—</div>
+      <div class="kpi-sub" id="kpi-city-sub">—</div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Top RCA Bucket</div>
+      <div class="kpi-value" id="kpi-bucket" style="font-size:14px;line-height:1.3;">—</div>
+      <div class="kpi-sub" id="kpi-bucket-sub">—</div>
+    </div>
+  </div>
+
+  <!-- Row 1: Line chart (wide) + Donut -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Week-wise IGCC Rate Trend <span class="badge" id="line-badge">—</span></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-line" height="120"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">RCA Bucket Contribution</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-donut" height="240"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: City bar, Stacked bucket bar, SPOC -->
+  <div class="charts-grid-3">
+    <div class="chart-card">
+      <div class="chart-title">City-wise IGCC Rate <span class="badge" id="city-bar-badge">Top 20</span></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-city-bar" height="280"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">IGCC by Week &amp; Bucket (Stacked)</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-stacked" height="280"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">SPOC Breakdown</div>
+      <div class="chart-canvas-wrap"><canvas id="chart-spoc" height="280"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Heatmap full width -->
+  <div class="chart-card" style="margin-bottom:12px;">
+    <div class="chart-title">City × Week IGCC Rate Heatmap <span class="badge" id="heatmap-badge">—</span></div>
+    <div class="heatmap-scroll" id="heatmap-container"></div>
+  </div>
+
+  <!-- Week × SPOC Pivot Table -->
+  <div class="table-section">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        Week × SPOC IGCC Trend
+        <span class="badge" id="pivot-badge">—</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="table-info" id="pivot-info"></span>
+        <button class="btn btn-outline" id="download-pivot-btn" style="font-size:12px;padding:6px 12px;">⬇ Download Pivot CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:500px;margin-top:12px;">
+      <div id="pivot-container"></div>
+    </div>
+  </div>
+
+  <div class="footer">RCA Bucket Trend Dashboard &nbsp;|&nbsp; IGCC Rate = IGCC ÷ UNIC Orders (unique orders per Week+City)</div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────
+const BUCKET_COLORS = {
+  'External Damage/Bruises':           '#ef4444',
+  'Customer perception / Wrong claim': '#f97316',
+  'Raw':                               '#8b5cf6',
+  'Internal Rotten':                   '#a16207',
+  'External Rotten/ Fungal':           '#22c55e',
+  'Taste / water content':             '#06b6d4',
+  'Shrivelled / Dry':                  '#eab308',
+  'Underweight (packing issue)':       '#6366f1',
+  'Overripe':                          '#ec4899',
+  'Incorrect size (sourcing issue)':   '#14b8a6',
+  'Damage in transit':                 '#94a3b8',
+  '<NA>':                              '#475569'
+};
+const SPOC_COLORS = {
+  'Pod':      '#4f8ef7',
+  'CX':       '#f97316',
+  'Sourcing': '#22c55e',
+  'WH':       '#a855f7',
+  'DP':       '#ec4899',
+  '<NA>':     '#64748b'
+};
+const CITY_PALETTE = ['#4f8ef7','#f97316','#22c55e','#a855f7','#ec4899','#14b8a6','#eab308','#ef4444','#06b6d4','#84cc16','#f43f5e','#8b5cf6'];
+const SPOC_ORDER = ['Pod', 'CX', 'Sourcing', 'WH', 'DP'];
+const CHART_DEFAULTS = {
+  color: '#8892b0',
+  borderColor: '#2d3055',
+  backgroundColor: '#1a1d2e'
+};
+
+Chart.defaults.color = '#8892b0';
+Chart.defaults.borderColor = '#2d3055';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+
+// ─────────────────────────────────────────────
+// DATA STORE
+// ─────────────────────────────────────────────
+let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
+let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
+let filterState = { weeks: [], cities: [], spocs: [], buckets: [] };
+let charts = {};
+let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
+const PAGE_SIZE = 100;
+
+// Tom Select instances
+let tsWeek, tsCity, tsSpoc, tsBucket;
+
+// ─────────────────────────────────────────────
+// LOADING
+// ─────────────────────────────────────────────
+function setLoadText(msg) { document.getElementById('load-text').textContent = msg; }
+function setProgress(pct) { document.getElementById('progress-bar-fill').style.width = pct + '%'; }
+
+async function loadData() {
+  setLoadText('Loading UNIC Orders (Spoc_level.csv)...');
+  setProgress(10);
+
+  // Load spoc_level (small, fast)
+  await new Promise((resolve, reject) => {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Spoc_level.csv', {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => {
+        data.forEach(row => {
+          const weekVal = row.WEEK || row['﻿WEEK'] || '';
+          const w = String(weekVal).trim();
+          const c = String(row.CITY || '').trim();
+          const orders = parseInt(row.ORDERS_TOTAL, 10) || 0;
+          if (!w || !c) return;
+          if (!unicOrdersMap[w]) unicOrdersMap[w] = {};
+          unicOrdersMap[w][c] = Math.max(unicOrdersMap[w][c] || 0, orders);
+        });
+        resolve();
+      },
+      error: reject
+    });
+  });
+
+  setLoadText('Loading weekly data (this may take 5–10 seconds)...');
+  setProgress(35);
+
+  // Load weekly CSV fully then aggregate
+  const cubeMap = {};
+
+  await new Promise((resolve, reject) => {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_weekly.csv', {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data, errors }) => {
+        if (errors && errors.length && !data.length) {
+          reject(new Error('Parse error: ' + errors[0].message));
+          return;
+        }
+        setLoadText(`Aggregating ${data.length.toLocaleString()} rows...`);
+        setProgress(70);
+        data.forEach(row => {
+          // Handle BOM on first column header
+          const weekVal = row.WEEK || row['﻿WEEK'] || '';
+          const week   = String(weekVal).trim();
+          const city   = String(row.CITY || '').trim();
+          const bucket = String(row['Basic Reason for IGCC'] || '').trim() || '<NA>';
+          const spoc   = String(row.SPOC || '').trim() || '<NA>';
+          const igcc   = parseInt(row.IGCC, 10) || 0;
+          if (!week || !city) return;
+          const key = `${week}|${city}|${bucket}|${spoc}`;
+          if (!cubeMap[key]) {
+            cubeMap[key] = { week, city, bucket, spoc, igcc: 0 };
+          }
+          cubeMap[key].igcc += igcc;
+        });
+        resolve();
+      },
+      error: (err) => reject(new Error(err.message || 'Failed to load weekly CSV'))
+    });
+  });
+
+  aggregatedCube = Object.values(cubeMap);
+  setProgress(90);
+  setLoadText(`Ready — ${aggregatedCube.length.toLocaleString()} aggregated combinations`);
+
+  await new Promise(r => setTimeout(r, 400));
+  setProgress(100);
+  initApp();
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+function initApp() {
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  const allWeeks   = [...new Set(aggregatedCube.map(r => r.week))].sort((a,b) => +a - +b);
+  const allCities  = [...new Set(aggregatedCube.map(r => r.city))].sort();
+  const allBuckets = [...new Set(aggregatedCube.map(r => r.bucket))].sort();
+  const allSpocs   = [...new Set(aggregatedCube.map(r => r.spoc))].sort();
+
+  // Data summary
+  const weeks = allWeeks;
+  document.getElementById('data-summary').textContent =
+    `${allCities.length} cities · Weeks ${weeks[0]}–${weeks[weeks.length-1]} · ${aggregatedCube.length.toLocaleString()} data combinations`;
+
+  // Tom Select – Week
+  tsWeek = new TomSelect('#filter-week', {
+    plugins: ['remove_button'],
+    options: allWeeks.map(w => ({ value: w, text: `Week ${w}` })),
+    onChange: onFilterChange
+  });
+  // Tom Select – City
+  tsCity = new TomSelect('#filter-city', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allCities.map(c => ({ value: c, text: c })),
+    maxItems: null,
+    onChange: onFilterChange
+  });
+  // Tom Select – SPOC
+  tsSpoc = new TomSelect('#filter-spoc', {
+    plugins: ['remove_button'],
+    options: allSpocs.map(s => ({ value: s, text: s })),
+    onChange: onFilterChange
+  });
+  // Tom Select – Bucket
+  tsBucket = new TomSelect('#filter-bucket', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allBuckets.map(b => ({
+      value: b,
+      text: b,
+      color: BUCKET_COLORS[b] || '#888'
+    })),
+    render: {
+      option: (data) => `<div class="option"><span class="bucket-dot" style="background:${data.color||'#888'}"></span>${data.text}</div>`,
+      item: (data) => `<div class="item"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${data.color||'#888'};margin-right:5px;vertical-align:middle;"></span>${data.text}</div>`
+    },
+    onChange: onFilterChange
+  });
+
+  // Reset button
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    tsWeek.clear(true);
+    tsCity.clear(true);
+    tsSpoc.clear(true);
+    tsBucket.clear(true);
+    onFilterChange();
+  });
+
+  // Download buttons
+  document.getElementById('download-btn').addEventListener('click', downloadCSV);
+  document.getElementById('download-pivot-btn').addEventListener('click', downloadPivotCSV);
+  document.getElementById('download-summary-btn').addEventListener('click', downloadSummaryCSV);
+
+  initCharts();
+  onFilterChange();
+}
+
+// ─────────────────────────────────────────────
+// FILTER
+// ─────────────────────────────────────────────
+function onFilterChange() {
+  filterState.weeks   = tsWeek   ? tsWeek.getValue()   : [];
+  filterState.cities  = tsCity   ? tsCity.getValue()   : [];
+  filterState.spocs   = tsSpoc   ? tsSpoc.getValue()   : [];
+  filterState.buckets = tsBucket ? tsBucket.getValue() : [];
+  const rows = getFilteredRows();
+  const agg  = computeAggregates(rows);
+  renderSummaryTable(rows);
+  renderKPIs(agg);
+  updateAllCharts(agg, rows);
+  renderPivotTable(rows);
+}
+
+function getFilteredRows() {
+  return aggregatedCube.filter(r => {
+    if (filterState.weeks.length   && !filterState.weeks.includes(r.week))   return false;
+    if (filterState.cities.length  && !filterState.cities.includes(r.city))  return false;
+    if (filterState.spocs.length   && !filterState.spocs.includes(r.spoc))   return false;
+    if (filterState.buckets.length && !filterState.buckets.includes(r.bucket)) return false;
+    return true;
+  });
+}
+
+// ─────────────────────────────────────────────
+// AGGREGATE
+// ─────────────────────────────────────────────
+function computeAggregates(rows) {
+  // Unique WEEK+CITY → UNIC Orders
+  const weekCityUnic = {};
+  rows.forEach(r => {
+    const key = `${r.week}|${r.city}`;
+    if (!weekCityUnic[key]) {
+      weekCityUnic[key] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    }
+  });
+  const totalUNIC = Object.values(weekCityUnic).reduce((s,v) => s+v, 0);
+  const totalIGCC = rows.reduce((s,r) => s+r.igcc, 0);
+  const igccRate  = totalUNIC > 0 ? (totalIGCC / totalUNIC * 100) : 0;
+
+  // By week → aggregate IGCC + UNIC
+  const byWeek = {};
+  rows.forEach(r => {
+    if (!byWeek[r.week]) byWeek[r.week] = { igcc:0, unic:0, cities:{} };
+    byWeek[r.week].igcc += r.igcc;
+    if (!byWeek[r.week].cities[r.city]) {
+      byWeek[r.week].cities[r.city] = 1;
+      byWeek[r.week].unic += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    }
+  });
+
+  // By week+city for trend
+  const byWeekCity = {};
+  rows.forEach(r => {
+    if (!byWeekCity[r.week]) byWeekCity[r.week] = {};
+    if (!byWeekCity[r.week][r.city]) {
+      byWeekCity[r.week][r.city] = { igcc:0, unic: (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0 };
+    }
+    byWeekCity[r.week][r.city].igcc += r.igcc;
+  });
+
+  // By city
+  const byCityIGCC = {};
+  const byCityUNIC = {};
+  rows.forEach(r => {
+    byCityIGCC[r.city] = (byCityIGCC[r.city] || 0) + r.igcc;
+    if (!byCityUNIC[r.city]) byCityUNIC[r.city] = 0;
+  });
+  Object.keys(weekCityUnic).forEach(key => {
+    const [w,c] = key.split('|');
+    if (byCityIGCC[c] !== undefined) byCityUNIC[c] = (byCityUNIC[c] || 0) + weekCityUnic[key];
+  });
+
+  // By bucket
+  const byBucket = {};
+  rows.forEach(r => { byBucket[r.bucket] = (byBucket[r.bucket]||0) + r.igcc; });
+
+  // By week+bucket
+  const byWeekBucket = {};
+  rows.forEach(r => {
+    if (!byWeekBucket[r.week]) byWeekBucket[r.week] = {};
+    byWeekBucket[r.week][r.bucket] = (byWeekBucket[r.week][r.bucket]||0) + r.igcc;
+  });
+
+  // By spoc
+  const bySpoc = {};
+  const bySpocUNIC = {};
+  rows.forEach(r => {
+    bySpoc[r.spoc] = (bySpoc[r.spoc]||0) + r.igcc;
+  });
+  // SPOC unic: sum unique week+city per spoc
+  const spocWeekCity = {};
+  rows.forEach(r => {
+    if (!spocWeekCity[r.spoc]) spocWeekCity[r.spoc] = new Set();
+    spocWeekCity[r.spoc].add(`${r.week}|${r.city}`);
+  });
+  Object.keys(spocWeekCity).forEach(spoc => {
+    bySpocUNIC[spoc] = 0;
+    spocWeekCity[spoc].forEach(key => {
+      bySpocUNIC[spoc] += weekCityUnic[key] || 0;
+    });
+  });
+
+  // Top city (by rate)
+  let topCity = '', topCityRate = -1, topCityIGCC = 0;
+  Object.keys(byCityIGCC).forEach(city => {
+    const rate = byCityUNIC[city] > 0 ? byCityIGCC[city] / byCityUNIC[city] : 0;
+    if (rate > topCityRate) { topCityRate = rate; topCity = city; topCityIGCC = byCityIGCC[city]; }
+  });
+
+  // Top bucket
+  const topBucketEntry = Object.entries(byBucket).sort((a,b)=>b[1]-a[1])[0] || ['—', 0];
+
+  const sortedWeeks = [...new Set(rows.map(r=>r.week))].sort((a,b)=>+a-+b);
+  const sortedCities = [...new Set(rows.map(r=>r.city))].sort();
+  const sortedBuckets = Object.keys(byBucket).sort((a,b)=>byBucket[b]-byBucket[a]);
+
+  return {
+    totalUNIC, totalIGCC, igccRate, topCity, topCityRate, topCityIGCC, topBucketEntry,
+    byWeek, byWeekCity, byCityIGCC, byCityUNIC,
+    byBucket, byWeekBucket, bySpoc, bySpocUNIC,
+    sortedWeeks, sortedCities, sortedBuckets,
+    uniqueCities: Object.keys(byCityIGCC).length
+  };
+}
+
+// ─────────────────────────────────────────────
+// KPIs
+// ─────────────────────────────────────────────
+function renderKPIs(agg) {
+  document.getElementById('kpi-orders').textContent = agg.totalUNIC.toLocaleString('en-IN');
+  document.getElementById('kpi-orders-sub').textContent = `${agg.uniqueCities} cities, ${agg.sortedWeeks.length} weeks`;
+
+  document.getElementById('kpi-igcc').textContent = agg.totalIGCC.toLocaleString('en-IN');
+  document.getElementById('kpi-igcc-sub').textContent = `${Object.keys(agg.byBucket).length} active buckets`;
+
+  document.getElementById('kpi-rate').textContent = agg.igccRate.toFixed(3) + '%';
+
+  document.getElementById('kpi-city').textContent = agg.topCity || '—';
+  document.getElementById('kpi-city-sub').textContent = agg.topCity ?
+    `Rate: ${(agg.topCityRate*100).toFixed(2)}% | IGCC: ${agg.topCityIGCC.toLocaleString('en-IN')}` : '—';
+
+  document.getElementById('kpi-bucket').textContent = agg.topBucketEntry[0];
+  const pct = agg.totalIGCC > 0 ? (agg.topBucketEntry[1]/agg.totalIGCC*100).toFixed(1) : 0;
+  document.getElementById('kpi-bucket-sub').textContent =
+    `${agg.topBucketEntry[1].toLocaleString('en-IN')} IGCC (${pct}% of total)`;
+}
+
+// ─────────────────────────────────────────────
+// CHARTS INIT
+// ─────────────────────────────────────────────
+function initCharts() {
+  // Line chart
+  charts.line = new Chart(document.getElementById('chart-line'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: true, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw !== null ? ctx.raw.toFixed(3)+'%' : 'N/A'}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#2d3055' }, ticks: { color: '#8892b0' } },
+        y: {
+          grid: { color: '#2d3055' }, ticks: { color: '#8892b0', callback: v => v.toFixed(2)+'%' },
+          title: { display: true, text: 'IGCC Rate %', color: '#8892b0' }
+        }
+      }
+    }
+  });
+
+  // Donut
+  charts.donut = new Chart(document.getElementById('chart-donut'), {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, padding: 6, font: { size: 11 } } },
+        tooltip: { callbacks: {
+          label: ctx => {
+            const total = ctx.dataset.data.reduce((s,v)=>s+v,0);
+            const pct = total>0 ? (ctx.raw/total*100).toFixed(1) : 0;
+            return ` ${ctx.label}: ${ctx.raw.toLocaleString('en-IN')} (${pct}%)`;
+          }
+        }}
+      }
+    }
+  });
+
+  // City bar (horizontal)
+  charts.cityBar = new Chart(document.getElementById('chart-city-bar'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: 'IGCC Rate %', data: [], backgroundColor: '#4f8ef7' }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => ` Rate: ${ctx.raw.toFixed(3)}%`
+        }}
+      },
+      scales: {
+        x: { grid: { color: '#2d3055' }, ticks: { color: '#8892b0', callback: v => v.toFixed(2)+'%' } },
+        y: { grid: { display: false }, ticks: { color: '#8892b0', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Stacked bar
+  charts.stacked = new Chart(document.getElementById('chart-stacked'), {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, padding: 6, font: { size: 10 } } },
+        tooltip: { callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString('en-IN')}`
+        }}
+      },
+      scales: {
+        x: { stacked: true, grid: { color: '#2d3055' }, ticks: { color: '#8892b0' } },
+        y: { stacked: true, grid: { color: '#2d3055' }, ticks: { color: '#8892b0', callback: v => v.toLocaleString('en-IN') } }
+      }
+    }
+  });
+
+  // SPOC bar
+  charts.spoc = new Chart(document.getElementById('chart-spoc'), {
+    type: 'bar',
+    data: { labels: [], datasets: [
+      { label: 'IGCC Count', data: [], backgroundColor: [], yAxisID: 'y' },
+      { label: 'IGCC Rate %', data: [], backgroundColor: [], borderColor: [], borderWidth: 2, type: 'line', yAxisID: 'y2' }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12 } },
+        tooltip: { callbacks: {
+          label: ctx => ctx.dataset.yAxisID === 'y2'
+            ? ` Rate: ${ctx.raw.toFixed(3)}%`
+            : ` IGCC: ${ctx.raw.toLocaleString('en-IN')}`
+        }}
+      },
+      scales: {
+        x: { grid: { color: '#2d3055' }, ticks: { color: '#8892b0' } },
+        y: { position: 'left', grid: { color: '#2d3055' }, ticks: { color: '#8892b0', callback: v => v.toLocaleString('en-IN') }, title: { display: true, text: 'IGCC Count', color: '#8892b0' } },
+        y2: { position: 'right', grid: { display: false }, ticks: { color: '#8892b0', callback: v => v.toFixed(2)+'%' }, title: { display: true, text: 'Rate %', color: '#8892b0' } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// CHART UPDATE
+// ─────────────────────────────────────────────
+function updateAllCharts(agg, rows) {
+  updateLineChart(agg);
+  updateDonut(agg);
+  updateCityBar(agg);
+  updateStackedBar(agg);
+  updateSpocBar(agg);
+  renderHeatmap(agg);
+}
+
+function updateLineChart(agg) {
+  const weeks = agg.sortedWeeks;
+  const selectedCities = filterState.cities.length ? filterState.cities : null;
+  const cities = agg.sortedCities;
+  let datasets;
+
+  if (selectedCities && selectedCities.length <= 10) {
+    // Per-city lines
+    datasets = selectedCities.map((city, i) => ({
+      label: city,
+      data: weeks.map(w => {
+        const d = agg.byWeekCity[w] && agg.byWeekCity[w][city];
+        return (d && d.unic > 0) ? parseFloat((d.igcc / d.unic * 100).toFixed(4)) : null;
+      }),
+      borderColor: CITY_PALETTE[i % CITY_PALETTE.length],
+      backgroundColor: 'transparent',
+      tension: 0.3, spanGaps: true, borderWidth: 2,
+      pointRadius: 3, pointHoverRadius: 5
+    }));
+    document.getElementById('line-badge').textContent = `${selectedCities.length} cities`;
+  } else {
+    // Aggregate line
+    datasets = [{
+      label: 'All Cities (Aggregate)',
+      data: weeks.map(w => {
+        const d = agg.byWeek[w];
+        return (d && d.unic > 0) ? parseFloat((d.igcc / d.unic * 100).toFixed(4)) : null;
+      }),
+      borderColor: '#4f8ef7',
+      backgroundColor: 'rgba(79,142,247,0.08)',
+      tension: 0.3, fill: true, spanGaps: true, borderWidth: 2.5,
+      pointRadius: 3, pointHoverRadius: 5
+    }];
+    document.getElementById('line-badge').textContent = `${cities.length} cities aggregated`;
+  }
+
+  charts.line.data.labels = weeks.map(w => `W${w}`);
+  charts.line.data.datasets = datasets;
+  charts.line.update('none');
+}
+
+function updateDonut(agg) {
+  const entries = Object.entries(agg.byBucket).sort((a,b)=>b[1]-a[1]);
+  charts.donut.data.labels = entries.map(e=>e[0]);
+  charts.donut.data.datasets[0].data = entries.map(e=>e[1]);
+  charts.donut.data.datasets[0].backgroundColor = entries.map(e=>BUCKET_COLORS[e[0]]||'#888');
+  charts.donut.update('none');
+}
+
+function updateCityBar(agg) {
+  // Sort by IGCC rate desc, top 25
+  const entries = Object.keys(agg.byCityIGCC).map(city => ({
+    city,
+    igcc: agg.byCityIGCC[city],
+    unic: agg.byCityUNIC[city] || 0,
+    rate: agg.byCityUNIC[city] > 0 ? agg.byCityIGCC[city] / agg.byCityUNIC[city] * 100 : 0
+  })).sort((a,b) => b.rate - a.rate).slice(0,25);
+
+  const count = Object.keys(agg.byCityIGCC).length;
+  document.getElementById('city-bar-badge').textContent = count > 25 ? `Top 25 of ${count}` : `${count} cities`;
+
+  charts.cityBar.data.labels = entries.map(e=>e.city);
+  charts.cityBar.data.datasets[0].data = entries.map(e=>parseFloat(e.rate.toFixed(4)));
+  charts.cityBar.data.datasets[0].backgroundColor = entries.map((e,i) => {
+    if (e.rate > 2) return 'rgba(239,68,68,0.75)';
+    if (e.rate > 1) return 'rgba(245,158,11,0.75)';
+    return 'rgba(79,142,247,0.75)';
+  });
+  charts.cityBar.options.plugins.tooltip.callbacks.label = ctx => {
+    const e = entries[ctx.dataIndex];
+    return [
+      ` Rate: ${e.rate.toFixed(3)}%`,
+      ` IGCC: ${e.igcc.toLocaleString('en-IN')}`,
+      ` UNIC Orders: ${e.unic.toLocaleString('en-IN')}`
+    ];
+  };
+  charts.cityBar.update('none');
+}
+
+function updateStackedBar(agg) {
+  const weeks = agg.sortedWeeks;
+  // Show top 8 buckets by total IGCC; group rest as "Others"
+  const topBuckets = agg.sortedBuckets.slice(0, 8);
+  const hasOthers = agg.sortedBuckets.length > 8;
+
+  const datasets = topBuckets.map(bucket => ({
+    label: bucket.length > 28 ? bucket.slice(0,26)+'…' : bucket,
+    data: weeks.map(w => (agg.byWeekBucket[w] && agg.byWeekBucket[w][bucket]) || 0),
+    backgroundColor: BUCKET_COLORS[bucket] || '#888',
+    stack: 'igcc'
+  }));
+
+  if (hasOthers) {
+    const otherBuckets = agg.sortedBuckets.slice(8);
+    datasets.push({
+      label: 'Others',
+      data: weeks.map(w => {
+        if (!agg.byWeekBucket[w]) return 0;
+        return otherBuckets.reduce((s,b) => s + (agg.byWeekBucket[w][b]||0), 0);
+      }),
+      backgroundColor: '#4b5563',
+      stack: 'igcc'
+    });
+  }
+
+  charts.stacked.data.labels = weeks.map(w=>`W${w}`);
+  charts.stacked.data.datasets = datasets;
+  charts.stacked.update('none');
+}
+
+function updateSpocBar(agg) {
+  const spocs = Object.keys(agg.bySpoc).sort();
+  const colors = spocs.map(s => SPOC_COLORS[s] || '#888');
+
+  charts.spoc.data.labels = spocs;
+  charts.spoc.data.datasets[0].data = spocs.map(s => agg.bySpoc[s]||0);
+  charts.spoc.data.datasets[0].backgroundColor = colors.map(c => c+'bb');
+  charts.spoc.data.datasets[1].data = spocs.map(s => {
+    const unic = agg.bySpocUNIC[s] || 0;
+    const igcc = agg.bySpoc[s] || 0;
+    return unic > 0 ? parseFloat((igcc/unic*100).toFixed(4)) : 0;
+  });
+  charts.spoc.data.datasets[1].borderColor = colors;
+  charts.spoc.data.datasets[1].backgroundColor = colors.map(c => c+'44');
+  charts.spoc.update('none');
+}
+
+// ─────────────────────────────────────────────
+// HEATMAP (HTML table)
+// ─────────────────────────────────────────────
+function renderHeatmap(agg) {
+  const weeks = agg.sortedWeeks;
+  // Top 50 cities by total IGCC
+  const topCities = Object.keys(agg.byCityIGCC)
+    .sort((a,b) => agg.byCityIGCC[b] - agg.byCityIGCC[a])
+    .slice(0, 50);
+
+  document.getElementById('heatmap-badge').textContent =
+    `Top ${topCities.length} cities × ${weeks.length} weeks`;
+
+  // Find max rate for color scaling
+  let maxRate = 0.001;
+  topCities.forEach(city => {
+    weeks.forEach(w => {
+      const d = agg.byWeekCity[w] && agg.byWeekCity[w][city];
+      if (d && d.unic > 0) {
+        const r = d.igcc / d.unic;
+        if (r > maxRate) maxRate = r;
+      }
+    });
+  });
+
+  let html = '<table class="heatmap-table"><thead><tr>';
+  html += '<th class="city-col">City</th>';
+  weeks.forEach(w => { html += `<th>W${w}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  topCities.forEach(city => {
+    html += `<tr><td class="city-col">${city}</td>`;
+    weeks.forEach(w => {
+      const d = agg.byWeekCity[w] && agg.byWeekCity[w][city];
+      if (!d || d.unic === 0) {
+        html += `<td style="background:rgba(255,255,255,0.02);color:#444;">—</td>`;
+      } else {
+        const rate = d.igcc / d.unic;
+        const pct = (rate * 100).toFixed(2);
+        const intensity = Math.min(1, rate / maxRate);
+        // Color: low=dark blue, high=deep red
+        const r = Math.round(30 + intensity * 220);
+        const g = Math.round(60 - intensity * 40);
+        const b = Math.round(120 - intensity * 110);
+        const alpha = 0.2 + intensity * 0.75;
+        const textColor = intensity > 0.5 ? '#fff' : '#94a3b8';
+        html += `<td style="background:rgba(${r},${g},${b},${alpha});color:${textColor};" title="${city} W${w}: ${pct}% (IGCC:${d.igcc.toLocaleString()}, Orders:${d.unic.toLocaleString()})">${pct}%</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('heatmap-container').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// SUMMARY TABLE: City × SPOC
+// ─────────────────────────────────────────────
+function buildCitySpocData(rows) {
+  const spocs = SPOC_ORDER;
+
+  // cityUnic[city] = total unic (sum of unique week+city combos for that city)
+  const cityUnic = {};
+  const seenWC = {};
+  rows.forEach(r => {
+    if (!cityUnic[r.city]) cityUnic[r.city] = 0;
+    const key = `${r.week}|${r.city}`;
+    if (!seenWC[key]) {
+      seenWC[key] = 1;
+      cityUnic[r.city] += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    }
+  });
+
+  // citySpocIGCC[city][spoc] = total igcc
+  const citySpocIGCC = {};
+  rows.forEach(r => {
+    if (!citySpocIGCC[r.city]) citySpocIGCC[r.city] = {};
+    if (r.spoc && r.spoc !== '<NA>') {
+      citySpocIGCC[r.city][r.spoc] = (citySpocIGCC[r.city][r.spoc] || 0) + r.igcc;
+    }
+  });
+
+  // Sort cities by total IGCC descending
+  const cities = Object.keys(citySpocIGCC).sort((a, b) => {
+    const ta = spocs.reduce((s, sp) => s + (citySpocIGCC[a][sp] || 0), 0);
+    const tb = spocs.reduce((s, sp) => s + (citySpocIGCC[b][sp] || 0), 0);
+    return tb - ta;
+  });
+
+  return { cities, citySpocIGCC, cityUnic, spocs };
+}
+
+function renderSummaryTable(rows) {
+  const { cities, citySpocIGCC, cityUnic, spocs } = buildCitySpocData(rows);
+
+  document.getElementById('summary-badge').textContent = `${cities.length} cities × ${spocs.length} SPOCs`;
+  document.getElementById('summary-info').textContent = `Sorted by Total IGCC ↓`;
+
+  // Grand totals per SPOC
+  const grandSpoc = {};
+  spocs.forEach(s => { grandSpoc[s] = 0; });
+  let grandIGCC = 0, grandUnic = 0;
+
+  let html = '<table class="summary-table"><thead><tr>';
+  html += '<th class="row-hdr">City</th>';
+  spocs.forEach(s => {
+    html += `<th style="color:${SPOC_COLORS[s]||'#888'}">${s}</th>`;
+  });
+  html += '<th style="color:#fff;">Total IGCC</th>';
+  html += '<th style="color:var(--muted);">UNIC Orders</th>';
+  html += '<th style="color:var(--warning);">IGCC Rate %</th>';
+  html += '</tr></thead><tbody>';
+
+  cities.forEach(city => {
+    const unic = cityUnic[city] || 0;
+    const cityData = citySpocIGCC[city] || {};
+    const totalIGCC = spocs.reduce((s, sp) => s + (cityData[sp] || 0), 0);
+    const overallRate = unic > 0 ? (totalIGCC / unic * 100) : null;
+    grandIGCC += totalIGCC;
+    grandUnic += unic;
+
+    html += `<tr><td class="row-hdr">${city}</td>`;
+    spocs.forEach(s => {
+      const igcc = cityData[s] || 0;
+      grandSpoc[s] += igcc;
+      const rate = unic > 0 ? (igcc / unic * 100) : null;
+      const rateStr = rate !== null ? rate.toFixed(2) + '%' : '—';
+      if (igcc === 0) {
+        html += `<td><div class="pivot-cell-igcc" style="color:#444">—</div><div class="pivot-cell-rate">—</div></td>`;
+      } else {
+        html += `<td title="${city} | ${s} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rateStr}">
+          <div class="pivot-cell-igcc" style="color:${SPOC_COLORS[s]||'#ccc'}">${igcc.toLocaleString('en-IN')}</div>
+          <div class="pivot-cell-rate">${rateStr}</div>
+        </td>`;
+      }
+    });
+
+    const rateCls = overallRate !== null ? (overallRate > 2 ? 'rate-high' : overallRate > 0.8 ? 'rate-med' : 'rate-low') : '';
+    const rateDisplay = overallRate !== null ? overallRate.toFixed(3) + '%' : '—';
+    html += `<td><strong>${totalIGCC.toLocaleString('en-IN')}</strong></td>`;
+    html += `<td style="color:var(--muted)">${unic.toLocaleString('en-IN')}</td>`;
+    html += `<td><span class="rate-badge ${rateCls}">${rateDisplay}</span></td>`;
+    html += '</tr>';
+  });
+  html += '</tbody>';
+
+  // Grand total row
+  const grandRate = grandUnic > 0 ? (grandIGCC / grandUnic * 100) : null;
+  const grandRateCls = grandRate !== null ? (grandRate > 2 ? 'rate-high' : grandRate > 0.8 ? 'rate-med' : 'rate-low') : '';
+  html += '<tfoot><tr>';
+  html += '<td class="row-hdr" style="background:var(--surface2);font-weight:700;color:#fff;position:sticky;left:0;z-index:1;">GRAND TOTAL</td>';
+  spocs.forEach(s => {
+    const igcc = grandSpoc[s] || 0;
+    const rate = grandUnic > 0 ? (igcc / grandUnic * 100).toFixed(2) + '%' : '—';
+    html += `<td style="background:var(--surface2);font-weight:700;">
+      <div class="pivot-cell-igcc" style="color:${SPOC_COLORS[s]||'#ccc'}">${igcc.toLocaleString('en-IN')}</div>
+      <div class="pivot-cell-rate">${rate}</div>
+    </td>`;
+  });
+  html += `<td style="background:var(--surface2);font-weight:700;"><strong>${grandIGCC.toLocaleString('en-IN')}</strong></td>`;
+  html += `<td style="background:var(--surface2);color:var(--muted);">${grandUnic.toLocaleString('en-IN')}</td>`;
+  html += `<td style="background:var(--surface2);"><span class="rate-badge ${grandRateCls}">${grandRate !== null ? grandRate.toFixed(3)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('summary-container').innerHTML = html;
+}
+
+function downloadSummaryCSV() {
+  const rows = getFilteredRows();
+  const { cities, citySpocIGCC, cityUnic, spocs } = buildCitySpocData(rows);
+  const headers = ['City', ...spocs, 'Total IGCC', 'UNIC Orders', 'IGCC Rate %'];
+  const csvRows = [headers];
+  cities.forEach(city => {
+    const unic = cityUnic[city] || 0;
+    const data = citySpocIGCC[city] || {};
+    const total = spocs.reduce((s, sp) => s + (data[sp] || 0), 0);
+    const rate = unic > 0 ? (total / unic * 100).toFixed(3) : '';
+    csvRows.push([city, ...spocs.map(s => data[s] || 0), total, unic, rate]);
+  });
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rca_city_spoc_summary.csv';
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// PIVOT TABLE: Week × SPOC  (with sparklines)
+// ─────────────────────────────────────────────
+
+function makeSpark(values, color) {
+  // values: array of numbers (rates). Draw a 80×28 SVG polyline.
+  const W = 80, H = 28, pad = 3;
+  const valid = values.filter(v => v !== null && !isNaN(v));
+  if (valid.length < 2) return '';
+  const mn = Math.min(...valid), mx = Math.max(...valid);
+  const range = mx - mn || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+    const y = v === null ? null : (H - pad) - ((v - mn) / range) * (H - pad * 2);
+    return y === null ? null : `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).filter(Boolean).join(' ');
+  const last = valid[valid.length - 1], first = valid[0];
+  const trend = last > first ? '#ef4444' : last < first ? '#10b981' : '#94a3b8';
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;margin:4px auto 0;">
+    <polyline points="${pts}" fill="none" stroke="${trend}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="2.5" fill="${trend}"/>
+  </svg>`;
+}
+
+function trendArrow(cur, prev) {
+  if (prev === null || cur === null) return '';
+  if (cur > prev * 1.02) return '<span style="color:#ef4444;font-size:11px;margin-left:4px;">▲</span>';
+  if (cur < prev * 0.98) return '<span style="color:#10b981;font-size:11px;margin-left:4px;">▼</span>';
+  return '<span style="color:#94a3b8;font-size:11px;margin-left:4px;">●</span>';
+}
+
+function renderPivotTable(rows) {
+  const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
+  const presentSpocs = SPOC_ORDER.filter(s => rows.some(r => r.spoc === s));
+  const spocs = presentSpocs.length ? presentSpocs : SPOC_ORDER;
+
+  // Compute unic per week
+  const weekUnic = {};
+  rows.forEach(r => {
+    if (!weekUnic[r.week]) weekUnic[r.week] = { cities: new Set(), total: 0 };
+    if (!weekUnic[r.week].cities.has(r.city)) {
+      weekUnic[r.week].cities.add(r.city);
+      weekUnic[r.week].total += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    }
+  });
+
+  // Pivot: week → spoc → igcc
+  const pivot = {};
+  rows.forEach(r => {
+    if (!pivot[r.week]) pivot[r.week] = {};
+    if (r.spoc && r.spoc !== '<NA>') {
+      pivot[r.week][r.spoc] = (pivot[r.week][r.spoc] || 0) + r.igcc;
+    }
+  });
+
+  // Pre-compute per-spoc rate series (for sparklines in header)
+  const spocRateSeries = {};
+  spocs.forEach(s => {
+    spocRateSeries[s] = weeks.map(w => {
+      const unic = weekUnic[w] ? weekUnic[w].total : 0;
+      const igcc = (pivot[w] && pivot[w][s]) || 0;
+      return unic > 0 ? igcc / unic * 100 : null;
+    });
+  });
+  // Total rate series (for rightmost sparkline)
+  const totalRateSeries = weeks.map(w => {
+    const unic = weekUnic[w] ? weekUnic[w].total : 0;
+    const igcc = spocs.reduce((s, sp) => s + ((pivot[w] && pivot[w][sp]) || 0), 0);
+    return unic > 0 ? igcc / unic * 100 : null;
+  });
+
+  document.getElementById('pivot-badge').textContent = `${weeks.length} weeks × ${spocs.length} SPOCs`;
+
+  const grandSpocIGCC = {};
+  spocs.forEach(s => { grandSpocIGCC[s] = 0; });
+  let grandTotalIGCC = 0, grandTotalUnic = 0;
+
+  // ── THEAD ──
+  let html = '<table class="pivot-table"><thead>';
+  // Row 1: labels
+  html += '<tr>';
+  html += '<th class="week-col" rowspan="2">Week</th>';
+  spocs.forEach(s => {
+    html += `<th style="color:${SPOC_COLORS[s]||'#888'};border-bottom:none;padding-bottom:2px;">${s}</th>`;
+  });
+  html += '<th style="color:#fff;border-bottom:none;padding-bottom:2px;">Total IGCC</th>';
+  html += '<th style="color:var(--muted);border-bottom:none;padding-bottom:2px;">UNIC Orders</th>';
+  html += '<th style="color:var(--warning);border-bottom:none;padding-bottom:2px;">IGCC Rate %</th>';
+  html += '</tr>';
+  // Row 2: sparklines
+  html += '<tr>';
+  spocs.forEach(s => {
+    html += `<th style="padding:0 8px 6px;border-top:none;">${makeSpark(spocRateSeries[s], SPOC_COLORS[s]||'#888')}</th>`;
+  });
+  html += `<th style="padding:0 8px 6px;border-top:none;">${makeSpark(totalRateSeries, '#4f8ef7')}</th>`;
+  html += '<th style="border-top:none;"></th>';
+  html += `<th style="padding:0 8px 6px;border-top:none;">${makeSpark(totalRateSeries, '#f59e0b')}</th>`;
+  html += '</tr>';
+  html += '</thead><tbody>';
+
+  // ── TBODY ──
+  weeks.forEach((w, wi) => {
+    const wPivot = pivot[w] || {};
+    const unic = weekUnic[w] ? weekUnic[w].total : 0;
+    const weekTotal = spocs.reduce((s, sp) => s + (wPivot[sp] || 0), 0);
+    const weekRate = unic > 0 ? (weekTotal / unic * 100) : null;
+    grandTotalUnic += unic;
+    grandTotalIGCC += weekTotal;
+
+    // Previous week values for arrows
+    const prevW = wi > 0 ? weeks[wi - 1] : null;
+    const prevUnic = prevW && weekUnic[prevW] ? weekUnic[prevW].total : 0;
+    const prevWeekTotal = prevW ? spocs.reduce((s, sp) => s + ((pivot[prevW] && pivot[prevW][sp]) || 0), 0) : null;
+    const prevWeekRate = prevW && prevUnic > 0 ? (prevWeekTotal / prevUnic * 100) : null;
+
+    html += `<tr><td class="week-col">W${w}</td>`;
+    spocs.forEach(s => {
+      const igcc = wPivot[s] || 0;
+      grandSpocIGCC[s] += igcc;
+      const rate = unic > 0 ? (igcc / unic * 100) : null;
+      const rateStr = rate !== null ? rate.toFixed(2) + '%' : '—';
+      const prevIgcc = prevW ? ((pivot[prevW] && pivot[prevW][s]) || 0) : null;
+      const prevRate = prevW && prevUnic > 0 ? (prevIgcc / prevUnic * 100) : null;
+      const arrow = trendArrow(rate, prevRate);
+      const igccDisplay = igcc > 0
+        ? `<div class="pivot-cell-igcc" style="color:${SPOC_COLORS[s]||'#ccc'}">${igcc.toLocaleString('en-IN')}${arrow}</div>`
+        : `<div class="pivot-cell-igcc" style="color:#444">—</div>`;
+      html += `<td title="${s} | W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rateStr}">
+        ${igccDisplay}
+        <div class="pivot-cell-rate">${rateStr}</div>
+      </td>`;
+    });
+
+    const rateCls = weekRate !== null ? (weekRate > 2 ? 'rate-high' : weekRate > 0.8 ? 'rate-med' : 'rate-low') : '';
+    const rateDisplay = weekRate !== null ? weekRate.toFixed(3) + '%' : '—';
+    const totalArrow = trendArrow(weekRate, prevWeekRate);
+    html += `<td><strong>${weekTotal.toLocaleString('en-IN')}</strong>${totalArrow}</td>`;
+    html += `<td style="color:var(--muted)">${unic.toLocaleString('en-IN')}</td>`;
+    html += `<td><span class="rate-badge ${rateCls}">${rateDisplay}</span>${totalArrow}</td>`;
+    html += '</tr>';
+  });
+  html += '</tbody>';
+
+  // ── TFOOT ──
+  const grandRate = grandTotalUnic > 0 ? (grandTotalIGCC / grandTotalUnic * 100) : null;
+  const grandRateCls = grandRate !== null ? (grandRate > 2 ? 'rate-high' : grandRate > 0.8 ? 'rate-med' : 'rate-low') : '';
+  html += '<tfoot><tr>';
+  html += '<td class="week-col">TOTAL</td>';
+  spocs.forEach(s => {
+    const igcc = grandSpocIGCC[s] || 0;
+    const rate = grandTotalUnic > 0 ? (igcc / grandTotalUnic * 100).toFixed(2) + '%' : '—';
+    html += `<td>
+      <div class="pivot-cell-igcc" style="color:${SPOC_COLORS[s]||'#ccc'}">${igcc.toLocaleString('en-IN')}</div>
+      <div class="pivot-cell-rate">${rate}</div>
+    </td>`;
+  });
+  html += `<td><strong>${grandTotalIGCC.toLocaleString('en-IN')}</strong></td>`;
+  html += `<td style="color:var(--muted)">${grandTotalUnic.toLocaleString('en-IN')}</td>`;
+  html += `<td><span class="rate-badge ${grandRateCls}">${grandRate !== null ? grandRate.toFixed(3)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('pivot-container').innerHTML = html;
+  document.getElementById('pivot-info').textContent = `${rows.length.toLocaleString()} filtered rows`;
+}
+
+// ─────────────────────────────────────────────
+// DOWNLOAD CSV
+// ─────────────────────────────────────────────
+function downloadCSV() {
+  const rows = getFilteredRows().map(r => {
+    const unic = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    const rate = unic > 0 ? (r.igcc / unic * 100).toFixed(4) : '';
+    return { Week: r.week, City: r.city, 'RCA Bucket': r.bucket, SPOC: r.spoc, IGCC: r.igcc, 'UNIC Orders': unic, 'IGCC Rate %': rate };
+  });
+  const csv = Papa.unparse(rows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'rca_bucket_filtered.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadPivotCSV() {
+  const rows = getFilteredRows();
+  const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
+  const spocs = SPOC_ORDER.filter(s => rows.some(r => r.spoc === s));
+
+  const weekUnic = {};
+  rows.forEach(r => {
+    if (!weekUnic[r.week]) weekUnic[r.week] = { cities: new Set(), total: 0 };
+    if (!weekUnic[r.week].cities.has(r.city)) {
+      weekUnic[r.week].cities.add(r.city);
+      weekUnic[r.week].total += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    }
+  });
+  const pivot = {};
+  rows.forEach(r => {
+    if (!pivot[r.week]) pivot[r.week] = {};
+    if (r.spoc && r.spoc !== '<NA>') pivot[r.week][r.spoc] = (pivot[r.week][r.spoc] || 0) + r.igcc;
+  });
+
+  const headers = ['Week', ...spocs, 'Total IGCC', 'UNIC Orders', 'IGCC Rate %'];
+  const csvRows = [headers];
+  weeks.forEach(w => {
+    const unic = weekUnic[w] ? weekUnic[w].total : 0;
+    const wPivot = pivot[w] || {};
+    const total = spocs.reduce((s,sp) => s + (wPivot[sp]||0), 0);
+    const rate = unic > 0 ? (total/unic*100).toFixed(3) : '';
+    csvRows.push([`W${w}`, ...spocs.map(s => wPivot[s]||0), total, unic, rate]);
+  });
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rca_week_spoc_pivot.csv';
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// START
+// ─────────────────────────────────────────────
+loadData().catch(err => {
+  document.getElementById('load-text').textContent = 'Error loading data: ' + err.message;
+  console.error(err);
+});
+</script>
+</body>
+</html>
