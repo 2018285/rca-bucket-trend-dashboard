@@ -166,6 +166,32 @@
   .pivot-cell-igcc { font-weight: 700; font-size: 14px; line-height: 1.2; }
   .pivot-cell-rate { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
+  /* City × Week trend table */
+  .cwt-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  .cwt-table th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 9px 12px; border: 1px solid var(--border); text-align: center; z-index: 2;
+  }
+  .cwt-table th.cwt-city { left: 0; z-index: 3; text-align: left; min-width: 140px; }
+  .cwt-table td { padding: 7px 10px; border: 1px solid rgba(255,255,255,0.05); text-align: center; vertical-align: middle; }
+  .cwt-table td.cwt-city {
+    position: sticky; left: 0; background: var(--surface); color: var(--text);
+    font-weight: 600; text-align: left; font-size: 12px; z-index: 1; min-width: 140px;
+  }
+  .cwt-table tbody tr:hover td { background: rgba(255,255,255,0.04); }
+  .cwt-table tbody tr:hover td.cwt-city { background: var(--surface2); }
+  .cwt-table tfoot td {
+    background: var(--surface2); font-weight: 700;
+    border-top: 2px solid var(--border); padding: 9px 12px; text-align: center;
+  }
+  .cwt-table tfoot td.cwt-city { position: sticky; left: 0; background: var(--surface2); z-index: 1; color: #fff; }
+  .cwt-rate { font-size: 12px; font-weight: 700; line-height: 1.2; }
+  .cwt-arrow { font-size: 10px; margin-left: 3px; }
+  .arr-up   { color: #ef4444; }
+  .arr-dn   { color: #10b981; }
+  .arr-flat { color: #94a3b8; }
+
   /* Footer */
   .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 16px 0; border-top: 1px solid var(--border); }
 
@@ -236,6 +262,22 @@
     </div>
     <div class="table-scroll" style="max-height:340px;margin-top:12px;">
       <div id="summary-container"></div>
+    </div>
+  </div>
+
+  <!-- City × Week Trend Table -->
+  <div class="table-section" style="margin-bottom:16px;">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        City × Week IGCC Rate Trend
+        <span class="badge" id="city-week-badge">—</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp; vs prior week</span>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:400px;margin-top:12px;">
+      <div id="city-week-trend-container"></div>
     </div>
   </div>
 
@@ -534,6 +576,7 @@ function onFilterChange() {
   const rows = getFilteredRows();
   const agg  = computeAggregates(rows);
   renderSummaryTable(rows);
+  renderCityWeekTrend(rows);
   renderKPIs(agg);
   updateAllCharts(agg, rows);
   renderPivotTable(rows);
@@ -979,6 +1022,144 @@ function renderHeatmap(agg) {
 
   html += '</tbody></table>';
   document.getElementById('heatmap-container').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// CITY × WEEK TREND TABLE
+// ─────────────────────────────────────────────
+function renderCityWeekTrend(rows) {
+  const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
+
+  // per week+city: igcc + unic
+  const wcData = {};
+  const seenWC = {};
+  rows.forEach(r => {
+    const k = `${r.week}|${r.city}`;
+    if (!wcData[k]) {
+      wcData[k] = { igcc: 0, unic: 0 };
+      if (!seenWC[k]) {
+        wcData[k].unic = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+        seenWC[k] = 1;
+      }
+    }
+    wcData[k].igcc += r.igcc;
+  });
+
+  // total IGCC per city (for sort)
+  const cityTotals = {};
+  Object.keys(wcData).forEach(k => {
+    const city = k.split('|')[1];
+    cityTotals[city] = (cityTotals[city] || 0) + wcData[k].igcc;
+  });
+
+  // cities sorted by total IGCC desc
+  const cities = [...new Set(rows.map(r => r.city))].sort((a,b) => (cityTotals[b]||0) - (cityTotals[a]||0));
+
+  // overall rate per week for footer
+  const weekFooter = {};
+  weeks.forEach(w => {
+    let totalIGCC = 0, totalUNIC = 0;
+    const seen = {};
+    rows.forEach(r => {
+      if (r.week !== w) return;
+      totalIGCC += r.igcc;
+      const ck = `${r.week}|${r.city}`;
+      if (!seen[ck]) {
+        seen[ck] = 1;
+        totalUNIC += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      }
+    });
+    weekFooter[w] = { igcc: totalIGCC, unic: totalUNIC };
+  });
+
+  document.getElementById('city-week-badge').textContent = `${cities.length} cities × ${weeks.length} weeks`;
+
+  // Build table
+  let html = '<table class="cwt-table"><thead><tr>';
+  html += '<th class="cwt-city">City</th>';
+  weeks.forEach(w => { html += `<th>W${w}</th>`; });
+  html += '<th style="color:#fff;">Overall Rate</th>';
+  html += '</tr></thead><tbody>';
+
+  cities.forEach(city => {
+    // compute overall rate for this city
+    let cityIGCC = 0, cityUNIC = 0;
+    weeks.forEach(w => {
+      const d = wcData[`${w}|${city}`];
+      if (d) { cityIGCC += d.igcc; cityUNIC += d.unic; }
+    });
+    const overallRate = cityUNIC > 0 ? (cityIGCC / cityUNIC * 100) : null;
+
+    html += `<tr><td class="cwt-city">${city}</td>`;
+    weeks.forEach((w, wi) => {
+      const d = wcData[`${w}|${city}`];
+      const rate = d && d.unic > 0 ? (d.igcc / d.unic * 100) : null;
+
+      // prior week rate
+      let prevRate = null;
+      if (wi > 0) {
+        const pd = wcData[`${weeks[wi-1]}|${city}`];
+        prevRate = pd && pd.unic > 0 ? (pd.igcc / pd.unic * 100) : null;
+      }
+
+      if (rate === null) {
+        html += `<td style="color:#3a4060;">—</td>`;
+      } else {
+        let arrowHtml = '';
+        if (prevRate !== null) {
+          if (rate > prevRate * 1.02) arrowHtml = `<span class="cwt-arrow arr-up">▲</span>`;
+          else if (rate < prevRate * 0.98) arrowHtml = `<span class="cwt-arrow arr-dn">▼</span>`;
+          else arrowHtml = `<span class="cwt-arrow arr-flat">●</span>`;
+        }
+        // color cell by rate severity
+        let cellColor;
+        if (rate > 2)    cellColor = 'rgba(239,68,68,0.12)';
+        else if (rate > 1) cellColor = 'rgba(245,158,11,0.10)';
+        else             cellColor = 'transparent';
+        const rateColor = rate > 2 ? '#f87171' : rate > 1 ? '#fbbf24' : '#94a3b8';
+        html += `<td style="background:${cellColor};" title="${city} | W${w} | Rate: ${rate.toFixed(3)}% | IGCC: ${d.igcc.toLocaleString()} | Orders: ${d.unic.toLocaleString()}">
+          <span class="cwt-rate" style="color:${rateColor}">${rate.toFixed(2)}%</span>${arrowHtml}
+        </td>`;
+      }
+    });
+
+    const oCls = overallRate !== null ? (overallRate > 2 ? 'rate-high' : overallRate > 1 ? 'rate-med' : 'rate-low') : '';
+    const oStr = overallRate !== null ? overallRate.toFixed(2) + '%' : '—';
+    html += `<td><span class="rate-badge ${oCls}">${oStr}</span></td>`;
+    html += '</tr>';
+  });
+
+  html += '</tbody><tfoot><tr>';
+  html += '<td class="cwt-city">ALL CITIES</td>';
+  let grandIGCC = 0, grandUNIC = 0;
+  weeks.forEach((w, wi) => {
+    const d = weekFooter[w];
+    const rate = d && d.unic > 0 ? (d.igcc / d.unic * 100) : null;
+    let prevRate = null;
+    if (wi > 0) {
+      const pd = weekFooter[weeks[wi-1]];
+      prevRate = pd && pd.unic > 0 ? (pd.igcc / pd.unic * 100) : null;
+    }
+    if (d) { grandIGCC += d.igcc; grandUNIC += d.unic; }
+    if (rate === null) {
+      html += `<td>—</td>`;
+    } else {
+      let arrowHtml = '';
+      if (prevRate !== null) {
+        if (rate > prevRate * 1.02) arrowHtml = `<span class="cwt-arrow arr-up">▲</span>`;
+        else if (rate < prevRate * 0.98) arrowHtml = `<span class="cwt-arrow arr-dn">▼</span>`;
+        else arrowHtml = `<span class="cwt-arrow arr-flat">●</span>`;
+      }
+      const rateColor = rate > 2 ? '#f87171' : rate > 1 ? '#fbbf24' : '#94a3b8';
+      html += `<td><span class="cwt-rate" style="color:${rateColor}">${rate.toFixed(2)}%</span>${arrowHtml}</td>`;
+    }
+  });
+  const grandRate = grandUNIC > 0 ? (grandIGCC / grandUNIC * 100) : null;
+  const gCls = grandRate !== null ? (grandRate > 2 ? 'rate-high' : grandRate > 1 ? 'rate-med' : 'rate-low') : '';
+  html += `<td><span class="rate-badge ${gCls}">${grandRate !== null ? grandRate.toFixed(2)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('city-week-trend-container').innerHTML = html;
 }
 
 // ─────────────────────────────────────────────
