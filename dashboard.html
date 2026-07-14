@@ -586,7 +586,7 @@ let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
 const PAGE_SIZE = 100;
 
 // Item tab state
-let itemState = { sortCol: 'IGCC', sortDir: 'desc', page: 0, filtered: [], inited: false };
+let itemState = { sortCol: 'DT', sortDir: 'asc', page: 0, filtered: [], inited: false };
 const ITEM_PAGE_SIZE = 100;
 
 // Tom Select instances
@@ -2014,12 +2014,17 @@ function renderItemTable() {
   const dir   = itemState.sortDir;
   const isNum = document.querySelector(`#item-table thead th[data-col="${col}"]`)?.dataset.type === 'num';
 
+  // Always sub-sort by DT asc → SPOC → IGCC desc so grouping is stable
   const sorted = [...itemState.filtered].sort((a, b) => {
     const av = isNum ? (parseFloat(a[col]) || 0) : String(a[col] || '').toLowerCase();
     const bv = isNum ? (parseFloat(b[col]) || 0) : String(b[col] || '').toLowerCase();
     if (av < bv) return dir === 'asc' ? -1 : 1;
     if (av > bv) return dir === 'asc' ?  1 : -1;
-    return 0;
+    // tie-break: DT asc → SPOC asc → IGCC desc
+    if (a.DT < b.DT) return -1; if (a.DT > b.DT) return 1;
+    const sp = SPOC_ORDER.indexOf(a.SPOC) - SPOC_ORDER.indexOf(b.SPOC);
+    if (sp !== 0) return sp;
+    return b.IGCC - a.IGCC;
   });
 
   const total = sorted.length;
@@ -2038,22 +2043,36 @@ function renderItemTable() {
   if (!slice.length) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
   } else {
+    let prevDT = null, prevSPOC = null;
     tbody.innerHTML = slice.map(r => {
       const bColor   = BUCKET_COLORS[r['Basic Reason for IGCC']] || '#888';
       const sColor   = SPOC_COLORS[r.SPOC] || '#888';
       const incNum   = parseFloat(r['inc_%']) || 0;
       const incColor = incNum > 5 ? '#f87171' : incNum > 2 ? '#fbbf24' : '#94a3b8';
-      return `<tr>
-        <td>${r.DT}</td>
-        <td class="num">W${r.WEEK}</td>
-        <td>${r.CITY}</td>
-        <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
-        <td style="font-weight:500;">${r.ITEM_NAME}</td>
-        <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${bColor};margin-right:5px;vertical-align:middle;"></span>${r['Basic Reason for IGCC']}</td>
-        <td style="color:${sColor};font-weight:600;">${r.SPOC}</td>
-        <td class="num" style="color:${r.IGCC>50?'#f87171':r.IGCC>20?'#fbbf24':'var(--text)'};font-weight:600;">${r.IGCC.toLocaleString('en-IN')}</td>
-        <td class="num">${r.ORDERS.toLocaleString('en-IN')}</td>
-        <td class="num" style="color:${incColor};">${r['inc_%']}</td>
+
+      const dtChanged   = r.DT   !== prevDT;
+      const spocChanged = r.SPOC !== prevSPOC || dtChanged;
+      const borderTop   = dtChanged && prevDT !== null ? 'border-top:2px solid var(--border);' : '';
+
+      const dtCell   = dtChanged   ? `<td style="${borderTop}font-weight:500;">${r.DT}</td>`
+                                   : `<td style="${borderTop}color:transparent;">—</td>`;
+      const spocCell = spocChanged ? `<td style="${borderTop}color:${sColor};font-weight:600;">${r.SPOC}</td>`
+                                   : `<td style="${borderTop}"></td>`;
+
+      prevDT   = r.DT;
+      prevSPOC = r.SPOC;
+
+      return `<tr style="${borderTop}">
+        ${dtCell}
+        <td class="num" style="${borderTop}">W${r.WEEK}</td>
+        <td style="${borderTop}">${r.CITY}</td>
+        <td style="${borderTop}color:var(--muted);">${r.ITEM_CODE_NEW}</td>
+        <td style="${borderTop}font-weight:500;">${r.ITEM_NAME}</td>
+        <td style="${borderTop}"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${bColor};margin-right:5px;vertical-align:middle;"></span>${r['Basic Reason for IGCC']}</td>
+        ${spocCell}
+        <td class="num" style="${borderTop}color:${r.IGCC>50?'#f87171':r.IGCC>20?'#fbbf24':'var(--text)'};font-weight:600;">${r.IGCC.toLocaleString('en-IN')}</td>
+        <td class="num" style="${borderTop}">${r.ORDERS.toLocaleString('en-IN')}</td>
+        <td class="num" style="${borderTop}color:${incColor};">${r['inc_%']}</td>
       </tr>`;
     }).join('');
   }
