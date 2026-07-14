@@ -192,6 +192,42 @@
   .arr-dn   { color: #10b981; }
   .arr-flat { color: #94a3b8; }
 
+  /* Tabs */
+  .tab-nav { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 18px; }
+  .tab-btn {
+    padding: 9px 20px; border: none; background: transparent; color: var(--muted);
+    font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -2px; border-radius: 6px 6px 0 0; transition: all 0.15s; white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); background: var(--surface2); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: transparent; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Item detail table */
+  .item-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .item-search { flex: 1; min-width: 200px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; color: var(--text); font-size: 13px; outline: none; }
+  .item-search:focus { border-color: var(--primary); }
+  .item-search::placeholder { color: var(--muted); }
+  .item-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .item-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .item-table-wrap { overflow: auto; max-height: 520px; }
+  .item-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  .item-table thead th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 9px 12px; border-bottom: 2px solid var(--border); cursor: pointer; user-select: none;
+    white-space: nowrap;
+  }
+  .item-table thead th:hover { color: var(--text); }
+  .item-table thead th.sorted { color: var(--primary); }
+  .item-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .item-table tbody tr:hover { background: var(--surface2); }
+  .item-table tbody td { padding: 8px 12px; color: var(--text); }
+  .item-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .item-page-bar { display: flex; gap: 6px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .item-page-info { font-size: 12px; color: var(--muted); flex: 1; }
+
   /* Footer */
   .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 16px 0; border-top: 1px solid var(--border); }
 
@@ -227,6 +263,15 @@
       <button class="btn btn-primary" id="download-btn">⬇ Download CSV</button>
     </div>
   </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="tab-trend">Trend Dashboard</button>
+    <button class="tab-btn" data-tab="tab-items">Item-wise Details</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════ TAB 1: TREND ═══════════════════════════════════════ -->
+  <div id="tab-trend" class="tab-pane active">
 
   <!-- Filters -->
   <div class="filters-bar">
@@ -362,6 +407,85 @@
   </div>
 
   <div class="footer">RCA Bucket Trend Dashboard &nbsp;|&nbsp; IGCC Rate = IGCC ÷ UNIC Orders (unique orders per Week+City)</div>
+
+  </div><!-- /tab-trend -->
+
+  <!-- ═══════════════════════════════════════ TAB 2: ITEM DETAILS ═══════════════════════════════════════ -->
+  <div id="tab-items" class="tab-pane">
+
+    <!-- Item KPIs -->
+    <div class="item-kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Rows</div>
+        <div class="kpi-value" id="item-kpi-rows">—</div>
+        <div class="kpi-sub" id="item-kpi-rows-sub">—</div>
+      </div>
+      <div class="kpi-card danger">
+        <div class="kpi-label">Total IGCC</div>
+        <div class="kpi-value" id="item-kpi-igcc">—</div>
+        <div class="kpi-sub" id="item-kpi-igcc-sub">—</div>
+      </div>
+      <div class="kpi-card warning">
+        <div class="kpi-label">Unique Items</div>
+        <div class="kpi-value" id="item-kpi-items">—</div>
+        <div class="kpi-sub" id="item-kpi-items-sub">—</div>
+      </div>
+      <div class="kpi-card accent">
+        <div class="kpi-label">Top Item (IGCC)</div>
+        <div class="kpi-value" id="item-kpi-top" style="font-size:14px;line-height:1.3;">—</div>
+        <div class="kpi-sub" id="item-kpi-top-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="item-toolbar">
+      <input class="item-search" id="item-search" type="text" placeholder="Search item name, city, SPOC, bucket...">
+      <select id="item-filter-week" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;">
+        <option value="">All Weeks</option>
+      </select>
+      <select id="item-filter-city" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;">
+        <option value="">All Cities</option>
+      </select>
+      <select id="item-filter-spoc" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;">
+        <option value="">All SPOCs</option>
+      </select>
+      <select id="item-filter-bucket" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;max-width:220px;">
+        <option value="">All Buckets</option>
+      </select>
+      <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+      <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+      <span class="item-count" id="item-count-label">—</span>
+    </div>
+
+    <!-- Table -->
+    <div class="table-section" style="padding:0;background:transparent;border:none;">
+      <div class="item-table-wrap">
+        <table class="item-table" id="item-table">
+          <thead>
+            <tr>
+              <th data-col="WEEK" data-type="num">Week <span class="sort-icon">↕</span></th>
+              <th data-col="CITY" data-type="str">City <span class="sort-icon">↕</span></th>
+              <th data-col="ITEM_CODE_NEW" data-type="str">Item Code <span class="sort-icon">↕</span></th>
+              <th data-col="ITEM_NAME" data-type="str">Item Name <span class="sort-icon">↕</span></th>
+              <th data-col="Basic Reason for IGCC" data-type="str">RCA Bucket <span class="sort-icon">↕</span></th>
+              <th data-col="SPOC" data-type="str">SPOC <span class="sort-icon">↕</span></th>
+              <th data-col="IGCC" data-type="num">IGCC <span class="sort-icon">↕</span></th>
+              <th data-col="ORDERS" data-type="num">Orders <span class="sort-icon">↕</span></th>
+              <th data-col="inc_%" data-type="num">Inc % <span class="sort-icon">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="item-tbody"></tbody>
+        </table>
+      </div>
+      <div class="item-page-bar">
+        <span class="item-page-info" id="item-page-info">—</span>
+        <div class="pagination" id="item-pagination"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-items -->
+
+  <div class="footer">RCA Bucket Trend Dashboard &nbsp;|&nbsp; IGCC Rate = IGCC ÷ UNIC Orders (unique orders per Week+City)</div>
 </div>
 
 <script>
@@ -408,10 +532,15 @@ Chart.defaults.font.size = 12;
 // ─────────────────────────────────────────────
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
+let rawItemRows = [];       // raw rows from Item_level_weekly.csv
 let filterState = { weeks: [], cities: [], spocs: [], buckets: [] };
 let charts = {};
 let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
 const PAGE_SIZE = 100;
+
+// Item tab state
+let itemState = { sortCol: 'IGCC', sortDir: 'desc', page: 0, filtered: [] };
+const ITEM_PAGE_SIZE = 100;
 
 // Tom Select instances
 let tsWeek, tsCity, tsSpoc, tsBucket;
@@ -480,6 +609,18 @@ async function loadData() {
             cubeMap[key] = { week, city, bucket, spoc, igcc: 0 };
           }
           cubeMap[key].igcc += igcc;
+          // store raw row for item tab
+          rawItemRows.push({
+            WEEK: week,
+            CITY: city,
+            ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
+            ITEM_NAME: String(row.ITEM_NAME || '').trim(),
+            'Basic Reason for IGCC': bucket,
+            SPOC: spoc,
+            IGCC: igcc,
+            ORDERS: parseInt(row.ORDERS, 10) || 0,
+            'inc_%': String(row['inc_%'] || '').trim()
+          });
         });
         resolve();
       },
@@ -1568,6 +1709,221 @@ function downloadPivotCSV() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'rca_week_spoc_pivot.csv';
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tab-items' && rawItemRows.length && !itemState.filtered.length) {
+      initItemTab();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────
+// ITEM TAB
+// ─────────────────────────────────────────────
+function initItemTab() {
+  // Populate filter dropdowns
+  const weeks   = [...new Set(rawItemRows.map(r => r.WEEK))].sort((a,b) => +a - +b);
+  const cities  = [...new Set(rawItemRows.map(r => r.CITY))].sort();
+  const spocs   = [...new Set(rawItemRows.map(r => r.SPOC))].sort();
+  const buckets = [...new Set(rawItemRows.map(r => r['Basic Reason for IGCC']))].sort();
+
+  const wSel = document.getElementById('item-filter-week');
+  const cSel = document.getElementById('item-filter-city');
+  const sSel = document.getElementById('item-filter-spoc');
+  const bSel = document.getElementById('item-filter-bucket');
+
+  weeks.forEach(w   => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
+  cities.forEach(c  => { const o = document.createElement('option'); o.value = c; o.textContent = c;           cSel.appendChild(o); });
+  spocs.forEach(s   => { const o = document.createElement('option'); o.value = s; o.textContent = s;           sSel.appendChild(o); });
+  buckets.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b;           bSel.appendChild(o); });
+
+  // Sort headers
+  document.querySelectorAll('#item-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      if (itemState.sortCol === th.dataset.col) {
+        itemState.sortDir = itemState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        itemState.sortCol = th.dataset.col;
+        itemState.sortDir = th.dataset.type === 'num' ? 'desc' : 'asc';
+      }
+      itemState.page = 0;
+      renderItemTable();
+    });
+  });
+
+  // Search & filters
+  document.getElementById('item-search').addEventListener('input', () => { itemState.page = 0; applyItemFilters(); });
+  wSel.addEventListener('change', () => { itemState.page = 0; applyItemFilters(); });
+  cSel.addEventListener('change', () => { itemState.page = 0; applyItemFilters(); });
+  sSel.addEventListener('change', () => { itemState.page = 0; applyItemFilters(); });
+  bSel.addEventListener('change', () => { itemState.page = 0; applyItemFilters(); });
+
+  document.getElementById('item-reset-btn').addEventListener('click', () => {
+    document.getElementById('item-search').value = '';
+    wSel.value = ''; cSel.value = ''; sSel.value = ''; bSel.value = '';
+    itemState.page = 0; applyItemFilters();
+  });
+
+  document.getElementById('item-download-btn').addEventListener('click', downloadItemCSV);
+
+  applyItemFilters();
+}
+
+function applyItemFilters() {
+  const q      = document.getElementById('item-search').value.toLowerCase().trim();
+  const wVal   = document.getElementById('item-filter-week').value;
+  const cVal   = document.getElementById('item-filter-city').value;
+  const sVal   = document.getElementById('item-filter-spoc').value;
+  const bVal   = document.getElementById('item-filter-bucket').value;
+
+  itemState.filtered = rawItemRows.filter(r => {
+    if (wVal && r.WEEK   !== wVal) return false;
+    if (cVal && r.CITY   !== cVal) return false;
+    if (sVal && r.SPOC   !== sVal) return false;
+    if (bVal && r['Basic Reason for IGCC'] !== bVal) return false;
+    if (q) {
+      const hay = `${r.ITEM_NAME} ${r.CITY} ${r.SPOC} ${r['Basic Reason for IGCC']} ${r.ITEM_CODE_NEW}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderItemKPIs();
+  renderItemTable();
+}
+
+function renderItemKPIs() {
+  const rows = itemState.filtered;
+  const totalIGCC  = rows.reduce((s,r) => s + r.IGCC, 0);
+  const uniqueItems = new Set(rows.map(r => r.ITEM_CODE_NEW)).size;
+  const itemIGCC = {};
+  const itemName = {};
+  rows.forEach(r => {
+    itemIGCC[r.ITEM_CODE_NEW] = (itemIGCC[r.ITEM_CODE_NEW] || 0) + r.IGCC;
+    itemName[r.ITEM_CODE_NEW] = r.ITEM_NAME;
+  });
+  const topEntry = Object.entries(itemIGCC).sort((a,b) => b[1]-a[1])[0];
+
+  document.getElementById('item-kpi-rows').textContent     = rows.length.toLocaleString('en-IN');
+  document.getElementById('item-kpi-rows-sub').textContent  = `filtered rows`;
+  document.getElementById('item-kpi-igcc').textContent     = totalIGCC.toLocaleString('en-IN');
+  document.getElementById('item-kpi-igcc-sub').textContent  = `total IGCC`;
+  document.getElementById('item-kpi-items').textContent    = uniqueItems.toLocaleString('en-IN');
+  document.getElementById('item-kpi-items-sub').textContent = `unique item codes`;
+  if (topEntry) {
+    document.getElementById('item-kpi-top').textContent    = itemName[topEntry[0]] || topEntry[0];
+    document.getElementById('item-kpi-top-sub').textContent = `${topEntry[1].toLocaleString('en-IN')} IGCC`;
+  } else {
+    document.getElementById('item-kpi-top').textContent = '—';
+    document.getElementById('item-kpi-top-sub').textContent = '';
+  }
+}
+
+function renderItemTable() {
+  const col  = itemState.sortCol;
+  const dir  = itemState.sortDir;
+  const isNum = document.querySelector(`#item-table thead th[data-col="${col}"]`)?.dataset.type === 'num';
+
+  const sorted = [...itemState.filtered].sort((a, b) => {
+    const av = isNum ? (parseFloat(a[col]) || 0) : String(a[col] || '').toLowerCase();
+    const bv = isNum ? (parseFloat(b[col]) || 0) : String(b[col] || '').toLowerCase();
+    if (av < bv) return dir === 'asc' ? -1 :  1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
+  const total  = sorted.length;
+  const pages  = Math.max(1, Math.ceil(total / ITEM_PAGE_SIZE));
+  itemState.page = Math.min(itemState.page, pages - 1);
+  const start  = itemState.page * ITEM_PAGE_SIZE;
+  const slice  = sorted.slice(start, start + ITEM_PAGE_SIZE);
+
+  // Update sort icons
+  document.querySelectorAll('#item-table thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === col);
+    const icon = th.querySelector('.sort-icon');
+    if (th.dataset.col === col) icon.textContent = dir === 'asc' ? '↑' : '↓';
+    else icon.textContent = '↕';
+  });
+
+  const tbody = document.getElementById('item-tbody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const bColor = BUCKET_COLORS[r['Basic Reason for IGCC']] || '#888';
+      const sColor = SPOC_COLORS[r.SPOC] || '#888';
+      const incNum = parseFloat(r['inc_%']) || 0;
+      const incColor = incNum > 5 ? '#f87171' : incNum > 2 ? '#fbbf24' : '#94a3b8';
+      return `<tr>
+        <td class="num">W${r.WEEK}</td>
+        <td>${r.CITY}</td>
+        <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
+        <td style="font-weight:500;">${r.ITEM_NAME}</td>
+        <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${bColor};margin-right:5px;vertical-align:middle;"></span>${r['Basic Reason for IGCC']}</td>
+        <td style="color:${sColor};font-weight:600;">${r.SPOC}</td>
+        <td class="num" style="color:${r.IGCC>50?'#f87171':r.IGCC>20?'#fbbf24':'var(--text)'};font-weight:600;">${r.IGCC.toLocaleString('en-IN')}</td>
+        <td class="num">${r.ORDERS.toLocaleString('en-IN')}</td>
+        <td class="num" style="color:${incColor};">${r['inc_%']}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('item-count-label').textContent  = `${total.toLocaleString('en-IN')} rows`;
+  document.getElementById('item-page-info').textContent     = `Showing ${(start+1).toLocaleString('en-IN')}–${Math.min(start+ITEM_PAGE_SIZE,total).toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}`;
+
+  // Pagination
+  const pag = document.getElementById('item-pagination');
+  pag.innerHTML = '';
+  const maxBtns = 7;
+  let pStart = Math.max(0, itemState.page - Math.floor(maxBtns/2));
+  let pEnd   = Math.min(pages - 1, pStart + maxBtns - 1);
+  if (pEnd - pStart < maxBtns - 1) pStart = Math.max(0, pEnd - maxBtns + 1);
+
+  if (itemState.page > 0) {
+    const b = document.createElement('button');
+    b.className = 'page-btn'; b.textContent = '←';
+    b.onclick = () => { itemState.page--; renderItemTable(); };
+    pag.appendChild(b);
+  }
+  for (let i = pStart; i <= pEnd; i++) {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (i === itemState.page ? ' active' : '');
+    b.textContent = i + 1;
+    b.onclick = ((pi) => () => { itemState.page = pi; renderItemTable(); })(i);
+    pag.appendChild(b);
+  }
+  if (itemState.page < pages - 1) {
+    const b = document.createElement('button');
+    b.className = 'page-btn'; b.textContent = '→';
+    b.onclick = () => { itemState.page++; renderItemTable(); };
+    pag.appendChild(b);
+  }
+}
+
+function downloadItemCSV() {
+  const cols = ['WEEK','CITY','ITEM_CODE_NEW','ITEM_NAME','Basic Reason for IGCC','SPOC','IGCC','ORDERS','inc_%'];
+  const lines = [cols.join(',')];
+  itemState.filtered.forEach(r => {
+    lines.push(cols.map(c => {
+      const v = String(r[c] ?? '');
+      return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+    }).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rca_item_details.csv';
   a.click();
 }
 
