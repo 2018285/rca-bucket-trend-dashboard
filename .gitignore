@@ -1,1 +1,1 @@
-*.csv
+# No exclusions — CSVs are committed so GitHub Pages can serve live data
