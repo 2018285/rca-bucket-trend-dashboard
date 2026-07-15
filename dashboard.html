@@ -727,7 +727,7 @@ let TIER1_CITIES = new Set([
 ]);
 let TIER2_CITIES = new Set();  // populated from sheet; if empty, all non-T1 cities are T2
 
-const CITY_LIST_URL = `https://docs.google.com/spreadsheets/d/${WS_SHEET_ID}/export?format=csv&sheet=City+List`;
+const CITY_LIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjn6eDILDUnEYoYnjESkCoKxgwPBSUspiO_B8wqYebfYU8vaM2NJOaAqi7-FPFEc6YT21twNB2RXbf/pub?gid=928301632&single=true&output=csv';
 
 async function loadCityTiers() {
   try {
