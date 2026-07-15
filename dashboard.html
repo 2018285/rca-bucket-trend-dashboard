@@ -347,6 +347,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp; vs prior week &nbsp;|&nbsp; click city to expand/collapse</span>
+        <button class="btn btn-outline" id="download-cwt-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
       </div>
     </div>
     <div class="table-scroll" style="max-height:520px;margin-top:12px;">
@@ -413,7 +414,10 @@
 
   <!-- Row 3: Heatmap full width -->
   <div class="chart-card" style="margin-bottom:12px;">
-    <div class="chart-title">City × Week IGCC Rate Heatmap <span class="badge" id="heatmap-badge">—</span></div>
+    <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>City × Week IGCC Rate Heatmap <span class="badge" id="heatmap-badge">—</span></span>
+      <button class="btn btn-outline" id="download-heatmap-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
+    </div>
     <div class="heatmap-scroll" id="heatmap-container"></div>
   </div>
 
@@ -866,6 +870,8 @@ function initApp() {
   document.getElementById('download-btn').addEventListener('click', downloadCSV);
   document.getElementById('download-pivot-btn').addEventListener('click', downloadPivotCSV);
   document.getElementById('download-summary-btn').addEventListener('click', downloadSummaryCSV);
+  document.getElementById('download-cwt-btn').addEventListener('click', downloadCwtCSV);
+  document.getElementById('download-heatmap-btn').addEventListener('click', downloadHeatmapCSV);
 
   initCharts();
   onFilterChange();
@@ -1277,12 +1283,15 @@ function updateSpocBar(agg) {
 // ─────────────────────────────────────────────
 // HEATMAP (HTML table)
 // ─────────────────────────────────────────────
+let _lastHeatmapData = null;  // { weeks, topCities, byWeekCity }
+
 function renderHeatmap(agg) {
   const weeks = agg.sortedWeeks;
   // Top 50 cities by total IGCC
   const topCities = Object.keys(agg.byCityIGCC)
     .sort((a,b) => agg.byCityIGCC[b] - agg.byCityIGCC[a])
     .slice(0, 50);
+  _lastHeatmapData = { weeks, topCities, byWeekCity: agg.byWeekCity };
 
   document.getElementById('heatmap-badge').textContent =
     `Top ${topCities.length} cities × ${weeks.length} weeks`;
@@ -1333,6 +1342,8 @@ function renderHeatmap(agg) {
 // ─────────────────────────────────────────────
 // CITY × SPOC WEEKLY TREND TABLE
 // ─────────────────────────────────────────────
+let _lastCwtData = null;  // { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC }
+
 function renderCityWeekTrend(rows) {
   const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
   const presentSpocs = SPOC_ORDER.filter(s => rows.some(r => r.spoc === s));
@@ -1374,6 +1385,8 @@ function renderCityWeekTrend(rows) {
   const cityTotalIGCC = {};
   rows.forEach(r => { cityTotalIGCC[r.city] = (cityTotalIGCC[r.city] || 0) + r.igcc; });
   const cities = [...new Set(rows.map(r => r.city))].sort((a,b) => (cityTotalIGCC[b]||0) - (cityTotalIGCC[a]||0));
+
+  _lastCwtData = { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC };
 
   // grand totals per week for footer
   const weekTotals = {};
@@ -1875,6 +1888,62 @@ function downloadPivotCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = 'rca_week_spoc_pivot.csv';
   a.click();
+}
+
+function downloadCwtCSV() {
+  if (!_lastCwtData) return;
+  const { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC } = _lastCwtData;
+  const headers = ['City', 'SPOC', ...weeks.map(w => `W${w} IGCC`), ...weeks.map(w => `W${w} Rate%`), 'Overall Rate%'];
+  const csvRows = [headers];
+  cities.forEach(city => {
+    // City-level row
+    const cityUnic = weeks.reduce((s, w) => {
+      const seen = new Set();
+      return s + (!seen.has(w) && seen.add(w) ? (wcUnic[`${w}|${city}`] || 0) : 0);
+    }, 0);
+    const totalCityUnic = weeks.reduce((s, w) => s + (wcUnic[`${w}|${city}`] || 0), 0);
+    const totalCityIGCC = weeks.reduce((s, w) => s + (wcIGCC[`${w}|${city}`] || 0), 0);
+    const cityRate = totalCityUnic > 0 ? (totalCityIGCC / totalCityUnic * 100).toFixed(3) : '';
+    csvRows.push([
+      city, 'ALL',
+      ...weeks.map(w => wcIGCC[`${w}|${city}`] || 0),
+      ...weeks.map(w => { const u = wcUnic[`${w}|${city}`]||0; const i = wcIGCC[`${w}|${city}`]||0; return u > 0 ? (i/u*100).toFixed(3) : ''; }),
+      cityRate
+    ]);
+    // SPOC sub-rows
+    spocs.forEach(spoc => {
+      const spocTotal = weeks.reduce((s, w) => s + (wcsIGCC[`${w}|${city}|${spoc}`] || 0), 0);
+      if (!spocTotal) return;
+      const spocRate = totalCityUnic > 0 ? (spocTotal / totalCityUnic * 100).toFixed(3) : '';
+      csvRows.push([
+        city, spoc,
+        ...weeks.map(w => wcsIGCC[`${w}|${city}|${spoc}`] || 0),
+        ...weeks.map(w => { const u = wcUnic[`${w}|${city}`]||0; const i = wcsIGCC[`${w}|${city}|${spoc}`]||0; return u > 0 && i > 0 ? (i/u*100).toFixed(3) : ''; }),
+        spocRate
+      ]);
+    });
+  });
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_city_spoc_weekly_trend.csv'; a.click();
+}
+
+function downloadHeatmapCSV() {
+  if (!_lastHeatmapData) return;
+  const { weeks, topCities, byWeekCity } = _lastHeatmapData;
+  const headers = ['City', ...weeks.map(w => `W${w} Rate%`), ...weeks.map(w => `W${w} IGCC`), ...weeks.map(w => `W${w} Orders`)];
+  const csvRows = [headers];
+  topCities.forEach(city => {
+    csvRows.push([
+      city,
+      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return (d && d.unic > 0) ? (d.igcc/d.unic*100).toFixed(3) : ''; }),
+      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return d ? d.igcc : 0; }),
+      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return d ? d.unic : 0; })
+    ]);
+  });
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_heatmap_city_week.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
