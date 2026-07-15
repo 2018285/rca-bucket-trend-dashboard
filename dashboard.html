@@ -2339,11 +2339,8 @@ function renderWsTable() {
     tbody.innerHTML = slice.map(r => {
       const pillsHtml = r._buckets.map(b => {
         const color = BUCKET_COLORS[b.bucket] || '#888';
-        return `<span class="bkt-pill" style="background:${color}22;color:${color};border:1px solid ${color}55;">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};"></span>
-          ${b.bucket} <b>(${b.count})</b>
-        </span>`;
-      }).join('');
+        return `<span style="color:${color};font-size:12px;font-weight:500;white-space:nowrap;">${b.bucket} (${b.count})</span>`;
+      }).join('<span style="color:var(--muted);margin:0 3px;">,</span>');
       const igccColor = r['Total IGCC'] > 50 ? '#f87171' : r['Total IGCC'] > 20 ? '#fbbf24' : 'var(--text)';
       return `<tr>
         <td class="num" style="font-weight:700;">W${r.WEEK}</td>
