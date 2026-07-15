@@ -719,11 +719,56 @@ Chart.defaults.font.size = 12;
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
 let rawItemRows = [];       // raw rows from Item_level_weekly.csv
-// Tier city definitions — dynamic: only cities present in the data are selected
-const TIER1_CITIES = new Set([
+// Tier city definitions — loaded dynamically from Google Sheet "City List" tab
+// Fallback hardcoded list used if sheet is unreachable
+let TIER1_CITIES = new Set([
   'Bengaluru','Bangalore','Chennai','Delhi','Delhi NCR','New Delhi',
   'Hyderabad','Kolkata','Mumbai','Pune'
 ]);
+let TIER2_CITIES = new Set();  // populated from sheet; if empty, all non-T1 cities are T2
+
+const CITY_LIST_URL = `https://docs.google.com/spreadsheets/d/${WS_SHEET_ID}/export?format=csv&sheet=City+List`;
+
+async function loadCityTiers() {
+  try {
+    const text = await new Promise((resolve, reject) => {
+      Papa.parse(CITY_LIST_URL, {
+        download: true, header: true, skipEmptyLines: true,
+        complete: ({ data }) => resolve(data),
+        error: reject
+      });
+    });
+    const rows = text;
+    if (!rows.length) return;
+
+    // Auto-detect column names (case-insensitive)
+    const cols = Object.keys(rows[0]);
+    const cityCol = cols.find(c => c.trim().toLowerCase() === 'city') || cols[0];
+    const tierCol = cols.find(c => c.trim().toLowerCase() === 'tier' || c.trim().toLowerCase().includes('tier'));
+
+    if (tierCol) {
+      // Sheet has explicit Tier column with values 1 / 2
+      const t1 = new Set(), t2 = new Set();
+      rows.forEach(r => {
+        const city = (r[cityCol] || '').trim();
+        const tier = String(r[tierCol] || '').trim();
+        if (!city) return;
+        if (tier === '1') t1.add(city);
+        else if (tier === '2') t2.add(city);
+      });
+      if (t1.size) TIER1_CITIES = t1;
+      if (t2.size) TIER2_CITIES = t2;
+    } else {
+      // No tier column — assume all cities in the sheet are Tier 1
+      const t1 = new Set();
+      rows.forEach(r => { const city = (r[cityCol] || '').trim(); if (city) t1.add(city); });
+      if (t1.size) TIER1_CITIES = t1;
+    }
+    console.log(`City tiers loaded: T1=${TIER1_CITIES.size}, T2=${TIER2_CITIES.size}`);
+  } catch (e) {
+    console.warn('City List sheet unavailable, using fallback tier list:', e);
+  }
+}
 
 function selectTier(tier) {
   if (!tsCity) return;
@@ -736,7 +781,8 @@ function selectTier(tier) {
     tsCity.clear(true);
     available.forEach(city => {
       const inT1 = TIER1_CITIES.has(city);
-      if ((tier === 1 && inT1) || (tier === 2 && !inT1)) tsCity.addItem(city, true);
+      const inT2 = TIER2_CITIES.size ? TIER2_CITIES.has(city) : !inT1;
+      if ((tier === 1 && inT1) || (tier === 2 && inT2)) tsCity.addItem(city, true);
     });
   }
   onFilterChange();
@@ -761,6 +807,9 @@ function setLoadText(msg) { document.getElementById('load-text').textContent = m
 function setProgress(pct) { document.getElementById('progress-bar-fill').style.width = pct + '%'; }
 
 async function loadData() {
+  // Load city tier list from Google Sheet in parallel with CSV data
+  loadCityTiers();
+
   setLoadText('Loading UNIC Orders (Spoc_level.csv)...');
   setProgress(10);
 
