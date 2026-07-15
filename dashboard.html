@@ -100,15 +100,6 @@
   .chart-title .badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 99px; color: var(--muted); font-weight: 400; }
   .chart-canvas-wrap { position: relative; }
 
-  /* Heatmap */
-  .heatmap-scroll { overflow: auto; max-height: 380px; }
-  .heatmap-table { border-collapse: collapse; font-size: 11px; white-space: nowrap; }
-  .heatmap-table th { position: sticky; background: var(--surface2); color: var(--muted); font-weight: 600; padding: 5px 8px; border: 1px solid var(--border); font-size: 11px; z-index: 2; }
-  .heatmap-table th.city-col { left: 0; z-index: 3; min-width: 120px; text-align: left; }
-  .heatmap-table td { padding: 4px 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center; font-size: 11px; font-weight: 500; cursor: default; }
-  .heatmap-table td.city-col { position: sticky; left: 0; background: var(--surface); color: var(--text); text-align: left; font-size: 12px; z-index: 1; }
-  .heatmap-table tr:hover td { filter: brightness(1.2); }
-
   /* Table */
   .table-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
   .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -410,15 +401,6 @@
       <div class="chart-title">SPOC Breakdown</div>
       <div class="chart-canvas-wrap"><canvas id="chart-spoc" height="280"></canvas></div>
     </div>
-  </div>
-
-  <!-- Row 3: Heatmap full width -->
-  <div class="chart-card" style="margin-bottom:12px;">
-    <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>City × Week IGCC Rate Heatmap <span class="badge" id="heatmap-badge">—</span></span>
-      <button class="btn btn-outline" id="download-heatmap-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
-    </div>
-    <div class="heatmap-scroll" id="heatmap-container"></div>
   </div>
 
   <!-- Week × SPOC Pivot Table -->
@@ -871,8 +853,6 @@ function initApp() {
   document.getElementById('download-pivot-btn').addEventListener('click', downloadPivotCSV);
   document.getElementById('download-summary-btn').addEventListener('click', downloadSummaryCSV);
   document.getElementById('download-cwt-btn').addEventListener('click', downloadCwtCSV);
-  document.getElementById('download-heatmap-btn').addEventListener('click', downloadHeatmapCSV);
-
   initCharts();
   onFilterChange();
 }
@@ -1150,7 +1130,6 @@ function updateAllCharts(agg, rows) {
   updateCityBar(agg);
   updateStackedBar(agg);
   updateSpocBar(agg);
-  renderHeatmap(agg);
 }
 
 function updateLineChart(agg) {
@@ -1278,65 +1257,6 @@ function updateSpocBar(agg) {
   charts.spoc.data.datasets[1].borderColor = colors;
   charts.spoc.data.datasets[1].backgroundColor = colors.map(c => c+'44');
   charts.spoc.update('none');
-}
-
-// ─────────────────────────────────────────────
-// HEATMAP (HTML table)
-// ─────────────────────────────────────────────
-let _lastHeatmapData = null;  // { weeks, topCities, byWeekCity }
-
-function renderHeatmap(agg) {
-  const weeks = agg.sortedWeeks;
-  // Top 50 cities by total IGCC
-  const topCities = Object.keys(agg.byCityIGCC)
-    .sort((a,b) => agg.byCityIGCC[b] - agg.byCityIGCC[a])
-    .slice(0, 50);
-  _lastHeatmapData = { weeks, topCities, byWeekCity: agg.byWeekCity };
-
-  document.getElementById('heatmap-badge').textContent =
-    `Top ${topCities.length} cities × ${weeks.length} weeks`;
-
-  // Find max rate for color scaling
-  let maxRate = 0.001;
-  topCities.forEach(city => {
-    weeks.forEach(w => {
-      const d = agg.byWeekCity[w] && agg.byWeekCity[w][city];
-      if (d && d.unic > 0) {
-        const r = d.igcc / d.unic;
-        if (r > maxRate) maxRate = r;
-      }
-    });
-  });
-
-  let html = '<table class="heatmap-table"><thead><tr>';
-  html += '<th class="city-col">City</th>';
-  weeks.forEach(w => { html += `<th>W${w}</th>`; });
-  html += '</tr></thead><tbody>';
-
-  topCities.forEach(city => {
-    html += `<tr><td class="city-col">${city}</td>`;
-    weeks.forEach(w => {
-      const d = agg.byWeekCity[w] && agg.byWeekCity[w][city];
-      if (!d || d.unic === 0) {
-        html += `<td style="background:rgba(255,255,255,0.02);color:#444;">—</td>`;
-      } else {
-        const rate = d.igcc / d.unic;
-        const pct = (rate * 100).toFixed(2);
-        const intensity = Math.min(1, rate / maxRate);
-        // Color: low=dark blue, high=deep red
-        const r = Math.round(30 + intensity * 220);
-        const g = Math.round(60 - intensity * 40);
-        const b = Math.round(120 - intensity * 110);
-        const alpha = 0.2 + intensity * 0.75;
-        const textColor = intensity > 0.5 ? '#fff' : '#94a3b8';
-        html += `<td style="background:rgba(${r},${g},${b},${alpha});color:${textColor};" title="${city} W${w}: ${pct}% (IGCC:${d.igcc.toLocaleString()}, Orders:${d.unic.toLocaleString()})">${pct}%</td>`;
-      }
-    });
-    html += '</tr>';
-  });
-
-  html += '</tbody></table>';
-  document.getElementById('heatmap-container').innerHTML = html;
 }
 
 // ─────────────────────────────────────────────
@@ -1926,24 +1846,6 @@ function downloadCwtCSV() {
   const csv = Papa.unparse(csvRows);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_city_spoc_weekly_trend.csv'; a.click();
-}
-
-function downloadHeatmapCSV() {
-  if (!_lastHeatmapData) return;
-  const { weeks, topCities, byWeekCity } = _lastHeatmapData;
-  const headers = ['City', ...weeks.map(w => `W${w} Rate%`), ...weeks.map(w => `W${w} IGCC`), ...weeks.map(w => `W${w} Orders`)];
-  const csvRows = [headers];
-  topCities.forEach(city => {
-    csvRows.push([
-      city,
-      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return (d && d.unic > 0) ? (d.igcc/d.unic*100).toFixed(3) : ''; }),
-      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return d ? d.igcc : 0; }),
-      ...weeks.map(w => { const d = byWeekCity[w] && byWeekCity[w][city]; return d ? d.unic : 0; })
-    ]);
-  });
-  const csv = Papa.unparse(csvRows);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_heatmap_city_week.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
