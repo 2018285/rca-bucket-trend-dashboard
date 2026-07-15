@@ -329,11 +329,11 @@
     </div>
   </div>
 
-  <!-- City × SPOC Weekly Trend Table -->
+  <!-- City × Week × RCA Bucket Trend Table -->
   <div class="table-section" style="margin-bottom:16px;">
     <div class="table-toolbar">
       <div class="chart-title" style="margin-bottom:0;">
-        City × SPOC Weekly IGCC Rate Trend
+        City × Week × RCA Bucket Trend
         <span class="badge" id="city-week-badge">—</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
@@ -1260,64 +1260,61 @@ function updateSpocBar(agg) {
 }
 
 // ─────────────────────────────────────────────
-// CITY × SPOC WEEKLY TREND TABLE
+// CITY × WEEK × RCA BUCKET TREND TABLE
 // ─────────────────────────────────────────────
-let _lastCwtData = null;  // { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC }
+let _lastCwtData = null;  // { weeks, cities, buckets, wcUnic, wcIGCC, wcbIGCC }
 
 function renderCityWeekTrend(rows) {
-  const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
-  const presentSpocs = SPOC_ORDER.filter(s => rows.some(r => r.spoc === s));
-  const spocs = presentSpocs.length ? presentSpocs : SPOC_ORDER;
+  const weeks   = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
 
-  // unic per week+city (for rate denominator)
+  // unic per week+city
   const wcUnic = {};
   rows.forEach(r => {
     const k = `${r.week}|${r.city}`;
     if (!wcUnic[k]) wcUnic[k] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
   });
 
-  // unic per week (city-deduplicated total)
-  const weekUnic = {};
-  rows.forEach(r => {
-    if (!weekUnic[r.week]) weekUnic[r.week] = { seen: new Set(), total: 0 };
-    if (!weekUnic[r.week].seen.has(r.city)) {
-      weekUnic[r.week].seen.add(r.city);
-      weekUnic[r.week].total += wcUnic[`${r.week}|${r.city}`] || 0;
-    }
-  });
-
-  // igcc per week+city+spoc
-  const wcsIGCC = {};
-  rows.forEach(r => {
-    if (!r.spoc || r.spoc === '<NA>') return;
-    const k = `${r.week}|${r.city}|${r.spoc}`;
-    wcsIGCC[k] = (wcsIGCC[k] || 0) + r.igcc;
-  });
-
-  // igcc per week+city (total across spocs)
+  // igcc per week+city (total)
   const wcIGCC = {};
   rows.forEach(r => {
     const k = `${r.week}|${r.city}`;
     wcIGCC[k] = (wcIGCC[k] || 0) + r.igcc;
   });
 
-  // total igcc per city (for city-level sort)
+  // igcc per week+city+bucket
+  const wcbIGCC = {};
+  rows.forEach(r => {
+    const k = `${r.week}|${r.city}|${r.bucket}`;
+    wcbIGCC[k] = (wcbIGCC[k] || 0) + r.igcc;
+  });
+
+  // total igcc per city (for sort)
   const cityTotalIGCC = {};
   rows.forEach(r => { cityTotalIGCC[r.city] = (cityTotalIGCC[r.city] || 0) + r.igcc; });
   const cities = [...new Set(rows.map(r => r.city))].sort((a,b) => (cityTotalIGCC[b]||0) - (cityTotalIGCC[a]||0));
 
-  _lastCwtData = { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC };
+  // buckets ordered by total IGCC desc
+  const bucketTotals = {};
+  rows.forEach(r => { bucketTotals[r.bucket] = (bucketTotals[r.bucket] || 0) + r.igcc; });
+  const buckets = Object.keys(bucketTotals).sort((a,b) => bucketTotals[b] - bucketTotals[a]);
+
+  _lastCwtData = { weeks, cities, buckets, wcUnic, wcIGCC, wcbIGCC };
 
   // grand totals per week for footer
   const weekTotals = {};
-  weeks.forEach(w => {
-    weekTotals[w] = { igcc: 0, unic: weekUnic[w] ? weekUnic[w].total : 0 };
-    rows.forEach(r => { if (r.week === w) weekTotals[w].igcc += r.igcc; });
+  rows.forEach(r => {
+    if (!weekTotals[r.week]) weekTotals[r.week] = { igcc: 0, seen: new Set(), unic: 0 };
+    weekTotals[r.week].igcc += r.igcc;
+    const k = `${r.week}|${r.city}`;
+    if (!weekTotals[r.week].seen.has(k)) {
+      weekTotals[r.week].seen.add(k);
+      weekTotals[r.week].unic += wcUnic[k] || 0;
+    }
   });
 
-  document.getElementById('city-week-badge').textContent = `${cities.length} cities × ${spocs.length} SPOCs × ${weeks.length} weeks`;
+  document.getElementById('city-week-badge').textContent =
+    `${cities.length} cities × ${buckets.length} buckets × ${weeks.length} weeks`;
 
-  // helper: arrow symbol
   function arrow(cur, prev) {
     if (prev === null || cur === null) return '';
     if (cur > prev * 1.02) return `<span class="cwt-arrow arr-up">▲</span>`;
@@ -1325,7 +1322,6 @@ function renderCityWeekTrend(rows) {
     return `<span class="cwt-arrow arr-flat">●</span>`;
   }
 
-  // helper: cell bg & text colour by rate severity
   function rateStyle(rate) {
     const bg    = rate > 2 ? 'rgba(239,68,68,0.14)' : rate > 1 ? 'rgba(245,158,11,0.11)' : 'transparent';
     const color = rate > 2 ? '#f87171'              : rate > 1 ? '#fbbf24'                : '#94a3b8';
@@ -1333,25 +1329,26 @@ function renderCityWeekTrend(rows) {
   }
 
   let html = '<table class="cwt-table"><thead><tr>';
-  html += '<th class="cwt-city" style="min-width:160px;">City / SPOC</th>';
+  html += '<th class="cwt-city" style="min-width:160px;">City / Bucket</th>';
   weeks.forEach(w => { html += `<th>W${w}</th>`; });
   html += '<th style="color:var(--warning);white-space:nowrap;">Overall Rate</th>';
   html += '</tr></thead><tbody>';
 
   cities.forEach(city => {
-    // ── City total row (city-level rate uses city unic, total igcc across all spocs) ──
-    let cityTotalAllWeeksIGCC = 0, cityTotalAllWeeksUNIC = 0;
+    // city-level totals
+    let cityTotalIGCCAll = 0, cityTotalUNICAll = 0;
     const seenWCity = {};
     rows.filter(r => r.city === city).forEach(r => {
-      cityTotalAllWeeksIGCC += r.igcc;
+      cityTotalIGCCAll += r.igcc;
       if (!seenWCity[r.week]) {
         seenWCity[r.week] = 1;
-        cityTotalAllWeeksUNIC += wcUnic[`${r.week}|${city}`] || 0;
+        cityTotalUNICAll += wcUnic[`${r.week}|${city}`] || 0;
       }
     });
-    const cityOverallRate = cityTotalAllWeeksUNIC > 0 ? (cityTotalAllWeeksIGCC / cityTotalAllWeeksUNIC * 100) : null;
+    const cityOverallRate = cityTotalUNICAll > 0 ? (cityTotalIGCCAll / cityTotalUNICAll * 100) : null;
     const coCls = cityOverallRate !== null ? (cityOverallRate > 2 ? 'rate-high' : cityOverallRate > 1 ? 'rate-med' : 'rate-low') : '';
 
+    // city header row
     html += `<tr class="cwt-city-hdr" onclick="cwtToggle(this)" style="cursor:pointer;background:var(--surface2);">`;
     html += `<td class="cwt-city" style="font-weight:700;font-size:13px;color:#e2e8f0;">
       <span class="cwt-toggle" style="font-size:10px;margin-right:6px;color:var(--muted);">▶</span>${city}
@@ -1370,7 +1367,7 @@ function renderCityWeekTrend(rows) {
         html += `<td style="color:#3a4060;">—</td>`;
       } else {
         const { bg, color } = rateStyle(rate);
-        html += `<td style="background:${bg};" title="${city} | W${w} | Rate: ${rate.toFixed(3)}%">
+        html += `<td style="background:${bg};" title="${city} | W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate.toFixed(3)}%">
           <span class="cwt-rate" style="color:${color};font-size:13px;">${rate.toFixed(2)}%</span>${arrow(rate, prevRate)}
         </td>`;
       }
@@ -1378,61 +1375,61 @@ function renderCityWeekTrend(rows) {
     html += `<td><span class="rate-badge ${coCls}">${cityOverallRate !== null ? cityOverallRate.toFixed(3)+'%' : '—'}</span></td>`;
     html += `</tr>`;
 
-    // ── SPOC sub-rows (hidden by default) ──
-    spocs.forEach(spoc => {
-      const spocColor = SPOC_COLORS[spoc] || '#888';
-      let spocTotalIGCC = 0;
-      weeks.forEach(w => { spocTotalIGCC += wcsIGCC[`${w}|${city}|${spoc}`] || 0; });
-      if (spocTotalIGCC === 0) return; // skip spocs with no data for this city
+    // bucket sub-rows (hidden by default)
+    buckets.forEach(bucket => {
+      const bColor = BUCKET_COLORS[bucket] || '#888';
+      const bucketTotal = weeks.reduce((s,w) => s + (wcbIGCC[`${w}|${city}|${bucket}`] || 0), 0);
+      if (bucketTotal === 0) return;
 
-      const spocOverallRate = cityTotalAllWeeksUNIC > 0 ? (spocTotalIGCC / cityTotalAllWeeksUNIC * 100) : null;
-      const soCls = spocOverallRate !== null ? (spocOverallRate > 2 ? 'rate-high' : spocOverallRate > 1 ? 'rate-med' : 'rate-low') : '';
+      const bOverallPct = cityTotalIGCCAll > 0 ? (bucketTotal / cityTotalIGCCAll * 100) : null;
 
       html += `<tr class="cwt-spoc-row" style="display:none;">`;
-      html += `<td class="cwt-city" style="padding-left:28px;color:${spocColor};font-size:12px;">
-        <span style="margin-right:5px;opacity:0.5;">└</span>${spoc}
+      html += `<td class="cwt-city" style="padding-left:28px;font-size:12px;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${bColor};margin-right:6px;vertical-align:middle;opacity:0.85;"></span>
+        <span style="color:${bColor};">${bucket}</span>
       </td>`;
       weeks.forEach((w, wi) => {
-        const unic = wcUnic[`${w}|${city}`] || 0;
-        const igcc = wcsIGCC[`${w}|${city}|${spoc}`] || 0;
-        const rate = unic > 0 && igcc > 0 ? (igcc / unic * 100) : null;
-        let prevRate = null;
+        const igcc = wcbIGCC[`${w}|${city}|${bucket}`] || 0;
+        const cityIGCC = wcIGCC[`${w}|${city}`] || 0;
+        const share = cityIGCC > 0 ? (igcc / cityIGCC * 100) : null;
+        let prevShare = null;
         if (wi > 0) {
-          const pu = wcUnic[`${weeks[wi-1]}|${city}`] || 0;
-          const pi = wcsIGCC[`${weeks[wi-1]}|${city}|${spoc}`] || 0;
-          prevRate = pu > 0 && pi > 0 ? (pi / pu * 100) : null;
+          const pi = wcbIGCC[`${weeks[wi-1]}|${city}|${bucket}`] || 0;
+          const pci = wcIGCC[`${weeks[wi-1]}|${city}`] || 0;
+          prevShare = pci > 0 && pi > 0 ? (pi / pci * 100) : null;
         }
-        if (rate === null) {
+        if (igcc === 0) {
           html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
         } else {
-          const { bg, color } = rateStyle(rate);
-          html += `<td style="background:${bg};" title="${city} | ${spoc} | W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate.toFixed(3)}%">
-            <div class="cwt-rate" style="color:${color};font-size:12px;">${rate.toFixed(2)}%</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:1px;">${igcc.toLocaleString('en-IN')}${arrow(rate, prevRate)}</div>
+          const barW = share ? Math.round(share) : 0;
+          html += `<td title="${city} | ${bucket} | W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Share: ${share ? share.toFixed(1)+'%' : '—'}">
+            <div style="font-size:12px;font-weight:600;color:${bColor};">${igcc.toLocaleString('en-IN')}${arrow(share, prevShare)}</div>
+            <div style="margin-top:3px;height:4px;border-radius:2px;background:rgba(255,255,255,0.06);overflow:hidden;">
+              <div style="height:100%;width:${barW}%;background:${bColor};opacity:0.7;border-radius:2px;"></div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px;">${share ? share.toFixed(1)+'%' : ''} of city</div>
           </td>`;
         }
       });
-      html += `<td><span class="rate-badge ${soCls}">${spocOverallRate !== null ? spocOverallRate.toFixed(3)+'%' : '—'}</span></td>`;
+      html += `<td style="text-align:center;font-size:11px;color:var(--muted);">${bOverallPct ? bOverallPct.toFixed(1)+'%' : '—'}</td>`;
       html += `</tr>`;
     });
   });
 
-  // ── Grand footer ──
+  // Grand footer
   html += '</tbody><tfoot><tr>';
   html += '<td class="cwt-city" style="font-weight:700;color:#fff;">ALL CITIES</td>';
   let gIGCC = 0, gUNIC = 0;
-  const seenWCAll = {};
-  rows.forEach(r => {
-    gIGCC += r.igcc;
-    const k = `${r.week}|${r.city}`;
-    if (!seenWCAll[k]) { seenWCAll[k] = 1; gUNIC += wcUnic[k] || 0; }
+  weeks.forEach(w => {
+    const d = weekTotals[w] || { igcc:0, unic:0 };
+    gIGCC += d.igcc; gUNIC += d.unic;
   });
   weeks.forEach((w, wi) => {
-    const d = weekTotals[w];
+    const d = weekTotals[w] || { igcc:0, unic:0 };
     const rate = d.unic > 0 ? (d.igcc / d.unic * 100) : null;
     let prevRate = null;
     if (wi > 0) {
-      const pd = weekTotals[weeks[wi-1]];
+      const pd = weekTotals[weeks[wi-1]] || { igcc:0, unic:0 };
       prevRate = pd.unic > 0 ? (pd.igcc / pd.unic * 100) : null;
     }
     if (rate === null) { html += `<td>—</td>`; return; }
@@ -1812,40 +1809,35 @@ function downloadPivotCSV() {
 
 function downloadCwtCSV() {
   if (!_lastCwtData) return;
-  const { weeks, cities, spocs, wcUnic, wcIGCC, wcsIGCC } = _lastCwtData;
-  const headers = ['City', 'SPOC', ...weeks.map(w => `W${w} IGCC`), ...weeks.map(w => `W${w} Rate%`), 'Overall Rate%'];
+  const { weeks, cities, buckets, wcUnic, wcIGCC, wcbIGCC } = _lastCwtData;
+  const headers = ['City', 'RCA Bucket',
+    ...weeks.map(w => `W${w} IGCC`),
+    ...weeks.map(w => `W${w} Share%`),
+    'Total IGCC', 'Share of City %'];
   const csvRows = [headers];
   cities.forEach(city => {
-    // City-level row
-    const cityUnic = weeks.reduce((s, w) => {
-      const seen = new Set();
-      return s + (!seen.has(w) && seen.add(w) ? (wcUnic[`${w}|${city}`] || 0) : 0);
-    }, 0);
     const totalCityUnic = weeks.reduce((s, w) => s + (wcUnic[`${w}|${city}`] || 0), 0);
     const totalCityIGCC = weeks.reduce((s, w) => s + (wcIGCC[`${w}|${city}`] || 0), 0);
     const cityRate = totalCityUnic > 0 ? (totalCityIGCC / totalCityUnic * 100).toFixed(3) : '';
-    csvRows.push([
-      city, 'ALL',
+    csvRows.push([city, 'ALL BUCKETS',
       ...weeks.map(w => wcIGCC[`${w}|${city}`] || 0),
       ...weeks.map(w => { const u = wcUnic[`${w}|${city}`]||0; const i = wcIGCC[`${w}|${city}`]||0; return u > 0 ? (i/u*100).toFixed(3) : ''; }),
-      cityRate
+      totalCityIGCC, cityRate
     ]);
-    // SPOC sub-rows
-    spocs.forEach(spoc => {
-      const spocTotal = weeks.reduce((s, w) => s + (wcsIGCC[`${w}|${city}|${spoc}`] || 0), 0);
-      if (!spocTotal) return;
-      const spocRate = totalCityUnic > 0 ? (spocTotal / totalCityUnic * 100).toFixed(3) : '';
-      csvRows.push([
-        city, spoc,
-        ...weeks.map(w => wcsIGCC[`${w}|${city}|${spoc}`] || 0),
-        ...weeks.map(w => { const u = wcUnic[`${w}|${city}`]||0; const i = wcsIGCC[`${w}|${city}|${spoc}`]||0; return u > 0 && i > 0 ? (i/u*100).toFixed(3) : ''; }),
-        spocRate
+    buckets.forEach(bucket => {
+      const bTotal = weeks.reduce((s, w) => s + (wcbIGCC[`${w}|${city}|${bucket}`] || 0), 0);
+      if (!bTotal) return;
+      const bShare = totalCityIGCC > 0 ? (bTotal / totalCityIGCC * 100).toFixed(1) : '';
+      csvRows.push([city, bucket,
+        ...weeks.map(w => wcbIGCC[`${w}|${city}|${bucket}`] || 0),
+        ...weeks.map(w => { const ci = wcIGCC[`${w}|${city}`]||0; const bi = wcbIGCC[`${w}|${city}|${bucket}`]||0; return ci > 0 && bi > 0 ? (bi/ci*100).toFixed(1) : ''; }),
+        bTotal, bShare
       ]);
     });
   });
   const csv = Papa.unparse(csvRows);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_city_spoc_weekly_trend.csv'; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_city_week_bucket_trend.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
