@@ -183,6 +183,17 @@
   .arr-dn   { color: #10b981; }
   .arr-flat { color: #94a3b8; }
 
+  /* Tier quick-select buttons */
+  .tier-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 1px 7px; border-radius: 5px; font-size: 10px; font-weight: 700;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface2);
+    color: var(--muted); transition: all 0.15s; line-height: 16px; white-space: nowrap;
+  }
+  .tier-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .tier-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tier-clear-btn { padding: 1px 5px; }
+
   /* CWT group-by toggle */
   .cwt-group-btn { transition: all 0.15s; }
   .cwt-group-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -315,7 +326,12 @@
       <select id="filter-week" multiple placeholder="All Weeks"></select>
     </div>
     <div class="filter-group wide">
-      <label>City</label>
+      <label style="display:flex;align-items:center;gap:6px;">
+        City
+        <button class="tier-btn" id="tier1-btn" onclick="selectTier(1)" title="Metro cities: Bengaluru, Chennai, Delhi, Hyderabad, Kolkata, Mumbai, Pune">T1</button>
+        <button class="tier-btn" id="tier2-btn" onclick="selectTier(2)" title="Tier-2 cities">T2</button>
+        <button class="tier-btn tier-clear-btn" onclick="selectTier(0)" title="Clear tier filter">✕</button>
+      </label>
       <select id="filter-city" multiple placeholder="All Cities"></select>
     </div>
     <div class="filter-group">
@@ -703,6 +719,29 @@ Chart.defaults.font.size = 12;
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
 let rawItemRows = [];       // raw rows from Item_level_weekly.csv
+// Tier city definitions — dynamic: only cities present in the data are selected
+const TIER1_CITIES = new Set([
+  'Bengaluru','Bangalore','Chennai','Delhi','Delhi NCR','New Delhi',
+  'Hyderabad','Kolkata','Mumbai','Pune'
+]);
+
+function selectTier(tier) {
+  if (!tsCity) return;
+  document.getElementById('tier1-btn').classList.toggle('active', tier === 1);
+  document.getElementById('tier2-btn').classList.toggle('active', tier === 2);
+  if (tier === 0) {
+    tsCity.clear(true);
+  } else {
+    const available = tsCity.options ? Object.keys(tsCity.options) : [];
+    tsCity.clear(true);
+    available.forEach(city => {
+      const inT1 = TIER1_CITIES.has(city);
+      if ((tier === 1 && inT1) || (tier === 2 && !inT1)) tsCity.addItem(city, true);
+    });
+  }
+  onFilterChange();
+}
+
 let filterState = { weeks: [], cities: [], spocs: [], buckets: [] };
 let charts = {};
 let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
@@ -835,7 +874,12 @@ function initApp() {
     plugins: ['remove_button', 'clear_button'],
     options: allCities.map(c => ({ value: c, text: c })),
     maxItems: null,
-    onChange: onFilterChange
+    onChange: () => {
+      // deactivate tier buttons on manual city change
+      document.getElementById('tier1-btn').classList.remove('active');
+      document.getElementById('tier2-btn').classList.remove('active');
+      onFilterChange();
+    }
   });
   // Tom Select – SPOC
   tsSpoc = new TomSelect('#filter-spoc', {
@@ -864,6 +908,8 @@ function initApp() {
     tsCity.clear(true);
     tsSpoc.clear(true);
     tsBucket.clear(true);
+    document.getElementById('tier1-btn').classList.remove('active');
+    document.getElementById('tier2-btn').classList.remove('active');
     onFilterChange();
   });
 
