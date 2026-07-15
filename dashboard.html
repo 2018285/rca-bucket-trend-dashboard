@@ -244,6 +244,18 @@
   .item-page-bar { display: flex; gap: 6px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
   .item-page-info { font-size: 12px; color: var(--muted); flex: 1; }
 
+  /* Item sub-tabs */
+  .item-subtab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .item-subtab-btn { padding: 6px 16px; border: none; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 5px 5px 0 0; transition: all 0.15s; }
+  .item-subtab-btn:hover { color: var(--text); background: var(--surface2); }
+  .item-subtab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .item-subpane { display: none; }
+  .item-subpane.active { display: block; }
+  /* Bucket pills for weekly summary */
+  .bkt-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 600; margin: 1px; white-space: nowrap; }
+  .ws-error-panel { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .ws-source-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+
   /* Footer */
   .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 16px 0; border-top: 1px solid var(--border); }
 
@@ -429,105 +441,212 @@
   <!-- ═══════════════════════════════════════ TAB 2: ITEM DETAILS ═══════════════════════════════════════ -->
   <div id="tab-items" class="tab-pane">
 
-    <!-- Filters bar -->
-    <div class="item-filters-bar">
-      <!-- Row 1: Date range + Week + Search -->
-      <div class="item-filter-row">
-        <div class="item-filter-group">
-          <label>Date From</label>
-          <input class="item-date-input" type="date" id="item-date-from">
-        </div>
-        <div class="item-filter-group">
-          <label>Date To</label>
-          <input class="item-date-input" type="date" id="item-date-to">
-        </div>
-        <div class="item-filter-group">
-          <label>Week</label>
-          <select class="item-sel" id="item-filter-week"><option value="">All Weeks</option></select>
-        </div>
-        <div class="item-filter-group" style="flex:1;">
-          <label>Search</label>
-          <input class="item-search" id="item-search" type="text" placeholder="Item name, code, city, SPOC, bucket...">
-        </div>
-        <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
-          <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
-          <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
-          <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
-        </div>
-      </div>
-      <!-- Row 2: City + SPOC + Bucket (dynamic / cascading) -->
-      <div class="item-filter-row">
-        <div class="item-filter-group">
-          <label>City</label>
-          <select class="item-sel" id="item-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
-        </div>
-        <div class="item-filter-group">
-          <label>SPOC</label>
-          <select class="item-sel" id="item-filter-spoc"><option value="">All SPOCs</option></select>
-        </div>
-        <div class="item-filter-group" style="flex:1;">
-          <label>RCA Bucket</label>
-          <select class="item-sel" id="item-filter-bucket" style="min-width:220px;width:100%;"><option value="">All Buckets</option></select>
-        </div>
-        <div class="item-filter-group">
-          <label>Item Name</label>
-          <select class="item-sel" id="item-filter-item" style="min-width:180px;"><option value="">All Items</option></select>
-        </div>
-      </div>
+    <!-- Inner sub-tab nav -->
+    <div class="item-subtab-nav">
+      <button class="item-subtab-btn active" data-subtab="subtab-weekly">Weekly Summary (Article wise)</button>
+      <button class="item-subtab-btn" data-subtab="subtab-daily">Daily Detail</button>
     </div>
 
-    <!-- KPI cards -->
-    <div class="item-kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Total Rows</div>
-        <div class="kpi-value" id="item-kpi-rows">—</div>
-        <div class="kpi-sub" id="item-kpi-rows-sub">filtered records</div>
-      </div>
-      <div class="kpi-card danger">
-        <div class="kpi-label">Total IGCC</div>
-        <div class="kpi-value" id="item-kpi-igcc">—</div>
-        <div class="kpi-sub" id="item-kpi-igcc-sub">—</div>
-      </div>
-      <div class="kpi-card warning">
-        <div class="kpi-label">Total Orders</div>
-        <div class="kpi-value" id="item-kpi-orders">—</div>
-        <div class="kpi-sub" id="item-kpi-orders-sub">IGCC Rate: <span id="item-kpi-rate">—</span></div>
-      </div>
-      <div class="kpi-card accent">
-        <div class="kpi-label">Top Item (IGCC)</div>
-        <div class="kpi-value" id="item-kpi-top" style="font-size:13px;line-height:1.3;">—</div>
-        <div class="kpi-sub" id="item-kpi-top-sub">—</div>
-      </div>
-    </div>
+    <!-- ── SUB-TAB: WEEKLY SUMMARY ── -->
+    <div id="subtab-weekly" class="item-subpane active">
 
-    <!-- SPOC % summary bar -->
-    <div class="spoc-summary-bar" id="spoc-summary-bar"></div>
+      <!-- Source bar + error panel -->
+      <div class="ws-source-bar" id="ws-source-bar" style="display:none;">
+        <span style="color:var(--success);">&#10003;</span>
+        <span id="ws-source-text">Loaded from Google Sheet</span>
+        <span style="margin-left:auto;"><button class="btn btn-outline" id="ws-reload-btn" style="font-size:11px;padding:4px 10px;">&#8635; Reload</button></span>
+      </div>
+      <div id="ws-error-panel" class="ws-error-panel" style="display:none;">
+        <div style="color:#f87171;font-weight:700;margin-bottom:8px;">&#9888; Could not load from Google Sheet</div>
+        <div id="ws-error-msg" style="color:var(--muted);font-size:12px;margin-bottom:10px;"></div>
+        <div style="font-size:12px;color:var(--muted);">
+          To fix: open the Google Sheet → <b>File → Share → Publish to web</b> → publish <b>"WeeklyRCA-Summary"</b> as CSV, then reload this page.
+          <a href="https://docs.google.com/spreadsheets/d/1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk/edit" target="_blank" style="color:var(--primary);margin-left:6px;">Open Sheet ↗</a>
+        </div>
+      </div>
 
-    <!-- Detail Table -->
-    <div class="table-section" style="padding:0;background:transparent;border:none;">
-      <div class="item-table-wrap">
-        <table class="item-table" id="item-table">
-          <thead>
-            <tr>
-              <th data-col="WEEK"  data-type="num">Week <span class="sort-icon">↕</span></th>
-              <th data-col="CITY"  data-type="str">City <span class="sort-icon">↕</span></th>
-              <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
-              <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
-              <th data-col="Basic Reason for IGCC" data-type="str">RCA Bucket <span class="sort-icon">↕</span></th>
-              <th data-col="SPOC"  data-type="str">SPOC <span class="sort-icon">↕</span></th>
-              <th data-col="IGCC"  data-type="num">IGCC <span class="sort-icon">↕</span></th>
-              <th data-col="ORDERS" data-type="num">Orders <span class="sort-icon">↕</span></th>
-              <th data-col="inc_%" data-type="num">Inc % <span class="sort-icon">↕</span></th>
-            </tr>
-          </thead>
-          <tbody id="item-tbody"></tbody>
-        </table>
+      <!-- Weekly Summary Filters bar -->
+      <div class="item-filters-bar" id="ws-filters-bar">
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>Week</label>
+            <select class="item-sel" id="ws-filter-week"><option value="">All Weeks</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>City</label>
+            <select class="item-sel" id="ws-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>RCA Bucket</label>
+            <select class="item-sel" id="ws-filter-bucket" style="min-width:200px;width:100%;"><option value="">All Buckets</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:2;">
+            <label>Search Item</label>
+            <input class="item-search" id="ws-search" type="text" placeholder="Item name or code...">
+          </div>
+          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
+            <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+            <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+            <span class="item-count" id="ws-count-label" style="line-height:34px;"></span>
+          </div>
+        </div>
       </div>
-      <div class="item-page-bar">
-        <span class="item-page-info" id="item-page-info">—</span>
-        <div class="pagination" id="item-pagination"></div>
+
+      <!-- Weekly KPI row -->
+      <div class="item-kpi-row" id="ws-kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Items</div>
+          <div class="kpi-value" id="ws-kpi-items">—</div>
+          <div class="kpi-sub">unique article entries</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">Total IGCC</div>
+          <div class="kpi-value" id="ws-kpi-igcc">—</div>
+          <div class="kpi-sub" id="ws-kpi-igcc-sub">—</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-label">Cities</div>
+          <div class="kpi-value" id="ws-kpi-cities">—</div>
+          <div class="kpi-sub" id="ws-kpi-cities-sub">—</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Top Item (IGCC)</div>
+          <div class="kpi-value" id="ws-kpi-top" style="font-size:13px;line-height:1.3;">—</div>
+          <div class="kpi-sub" id="ws-kpi-top-sub">—</div>
+        </div>
       </div>
-    </div>
+
+      <!-- Weekly Summary Table -->
+      <div class="table-section" style="padding:0;background:transparent;border:none;">
+        <div class="item-table-wrap">
+          <table class="item-table" id="ws-table">
+            <thead>
+              <tr>
+                <th data-col="WEEK"          data-type="num">Week <span class="sort-icon">↕</span></th>
+                <th data-col="CITY"          data-type="str">City <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
+                <th data-col="Total IGCC"    data-type="num">Total IGCC <span class="sort-icon">↕</span></th>
+                <th style="min-width:340px;">RCA Bucket Breakdown</th>
+              </tr>
+            </thead>
+            <tbody id="ws-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Loading weekly summary from Google Sheet…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="item-page-bar">
+          <span class="item-page-info" id="ws-page-info">—</span>
+          <div class="pagination" id="ws-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /subtab-weekly -->
+
+    <!-- ── SUB-TAB: DAILY DETAIL ── -->
+    <div id="subtab-daily" class="item-subpane">
+
+      <!-- Filters bar -->
+      <div class="item-filters-bar">
+        <!-- Row 1: Date range + Week + Search -->
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>Date From</label>
+            <input class="item-date-input" type="date" id="item-date-from">
+          </div>
+          <div class="item-filter-group">
+            <label>Date To</label>
+            <input class="item-date-input" type="date" id="item-date-to">
+          </div>
+          <div class="item-filter-group">
+            <label>Week</label>
+            <select class="item-sel" id="item-filter-week"><option value="">All Weeks</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>Search</label>
+            <input class="item-search" id="item-search" type="text" placeholder="Item name, code, city, SPOC, bucket...">
+          </div>
+          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
+            <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+            <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+            <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
+          </div>
+        </div>
+        <!-- Row 2: City + SPOC + Bucket (dynamic / cascading) -->
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>City</label>
+            <select class="item-sel" id="item-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>SPOC</label>
+            <select class="item-sel" id="item-filter-spoc"><option value="">All SPOCs</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>RCA Bucket</label>
+            <select class="item-sel" id="item-filter-bucket" style="min-width:220px;width:100%;"><option value="">All Buckets</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>Item Name</label>
+            <select class="item-sel" id="item-filter-item" style="min-width:180px;"><option value="">All Items</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="item-kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Rows</div>
+          <div class="kpi-value" id="item-kpi-rows">—</div>
+          <div class="kpi-sub" id="item-kpi-rows-sub">filtered records</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">Total IGCC</div>
+          <div class="kpi-value" id="item-kpi-igcc">—</div>
+          <div class="kpi-sub" id="item-kpi-igcc-sub">—</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-label">Total Orders</div>
+          <div class="kpi-value" id="item-kpi-orders">—</div>
+          <div class="kpi-sub" id="item-kpi-orders-sub">IGCC Rate: <span id="item-kpi-rate">—</span></div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Top Item (IGCC)</div>
+          <div class="kpi-value" id="item-kpi-top" style="font-size:13px;line-height:1.3;">—</div>
+          <div class="kpi-sub" id="item-kpi-top-sub">—</div>
+        </div>
+      </div>
+
+      <!-- SPOC % summary bar -->
+      <div class="spoc-summary-bar" id="spoc-summary-bar"></div>
+
+      <!-- Detail Table -->
+      <div class="table-section" style="padding:0;background:transparent;border:none;">
+        <div class="item-table-wrap">
+          <table class="item-table" id="item-table">
+            <thead>
+              <tr>
+                <th data-col="WEEK"  data-type="num">Week <span class="sort-icon">↕</span></th>
+                <th data-col="CITY"  data-type="str">City <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
+                <th data-col="Basic Reason for IGCC" data-type="str">RCA Bucket <span class="sort-icon">↕</span></th>
+                <th data-col="SPOC"  data-type="str">SPOC <span class="sort-icon">↕</span></th>
+                <th data-col="IGCC"  data-type="num">IGCC <span class="sort-icon">↕</span></th>
+                <th data-col="ORDERS" data-type="num">Orders <span class="sort-icon">↕</span></th>
+                <th data-col="inc_%" data-type="num">Inc % <span class="sort-icon">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="item-tbody"></tbody>
+          </table>
+        </div>
+        <div class="item-page-bar">
+          <span class="item-page-info" id="item-page-info">—</span>
+          <div class="pagination" id="item-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /subtab-daily -->
 
   </div><!-- /tab-items -->
 
@@ -1767,11 +1886,276 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'tab-items' && !itemState.inited) {
+    if (btn.dataset.tab === 'tab-items') {
+      // load weekly summary on first open (it's the default sub-tab)
+      if (!wsState.inited) loadWeeklySummary();
+    }
+  });
+});
+
+// Inner sub-tab switching
+document.querySelectorAll('.item-subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.item-subtab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.item-subpane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.subtab).classList.add('active');
+    if (btn.dataset.subtab === 'subtab-daily' && !itemState.inited) {
       loadDailyData();
     }
   });
 });
+
+// ─────────────────────────────────────────────
+// WEEKLY SUMMARY — loads from Google Sheet CSV export
+// ─────────────────────────────────────────────
+const WS_SHEET_ID = '1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk';
+const WS_GID      = '0'; // WeeklyRCA-Summary tab (first tab)
+const WS_CSV_URL  = `https://docs.google.com/spreadsheets/d/${WS_SHEET_ID}/export?format=csv&gid=${WS_GID}`;
+
+let wsRawRows  = [];  // parsed rows from Google Sheet
+let wsState    = { inited: false, sortCol: 'Total IGCC', sortDir: 'desc', page: 0, filtered: [] };
+const WS_PAGE_SIZE = 100;
+
+function parseReasonSummary(text) {
+  // "External Damage/Bruises (22.00), Shrivelled / Dry (6.00)" → [{bucket, count}]
+  if (!text) return [];
+  const out = [];
+  const re = /([^,(]+)\s*\((\d+(?:\.\d+)?)\)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const bucket = m[1].trim().replace(/^<|>$/g, '');
+    const count  = Math.round(parseFloat(m[2]));
+    if (bucket && count > 0) out.push({ bucket, count });
+  }
+  return out;
+}
+
+async function loadWeeklySummary() {
+  wsState.inited = true;
+  document.getElementById('ws-tbody').innerHTML =
+    `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Loading from Google Sheet…</td></tr>`;
+
+  try {
+    await new Promise((resolve, reject) => {
+      Papa.parse(WS_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: ({ data, errors }) => {
+          if (!data.length && errors.length) { reject(new Error(errors[0].message)); return; }
+          wsRawRows = data.map(row => ({
+            'Unique ID':            String(row['Unique ID'] || '').trim(),
+            WEEK:                   String(row.WEEK || row['﻿WEEK'] || '').trim(),
+            CITY:                   String(row.CITY || '').trim(),
+            ITEM_CODE_NEW:          String(row.ITEM_CODE_NEW || '').trim(),
+            ITEM_NAME:              String(row.ITEM_NAME || '').trim(),
+            'Total IGCC':           parseInt(row['Total IGCC'], 10) || 0,
+            'Unique Order Numbers': parseInt(row['Unique Order Numbers'], 10) || 0,
+            'Reason Summary':       String(row['Reason Summary'] || '').trim(),
+            _buckets:               parseReasonSummary(String(row['Reason Summary'] || '').trim())
+          })).filter(r => r.WEEK && r.CITY);
+          resolve();
+        },
+        error: (err) => reject(new Error(err.message || 'Fetch failed'))
+      });
+    });
+
+    document.getElementById('ws-error-panel').style.display  = 'none';
+    document.getElementById('ws-source-bar').style.display   = 'flex';
+    document.getElementById('ws-source-text').textContent    = `Loaded ${wsRawRows.length.toLocaleString('en-IN')} rows from Google Sheet`;
+    initWsSummaryTab();
+
+  } catch (err) {
+    document.getElementById('ws-error-panel').style.display  = 'block';
+    document.getElementById('ws-source-bar').style.display   = 'none';
+    document.getElementById('ws-error-msg').textContent      = err.message;
+    document.getElementById('ws-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Failed to load data — see instructions above.</td></tr>`;
+  }
+}
+
+document.getElementById('ws-reload-btn').addEventListener('click', () => {
+  wsState.inited = false;
+  wsRawRows = [];
+  loadWeeklySummary();
+});
+
+function initWsSummaryTab() {
+  // Populate week dropdown
+  const allWeeks = [...new Set(wsRawRows.map(r => r.WEEK))].sort((a, b) => +a - +b);
+  const wSel = document.getElementById('ws-filter-week');
+  wSel.innerHTML = '<option value="">All Weeks</option>';
+  allWeeks.forEach(w => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
+
+  // Populate city dropdown
+  const allCities = [...new Set(wsRawRows.map(r => r.CITY))].sort();
+  const cSel = document.getElementById('ws-filter-city');
+  cSel.innerHTML = '<option value="">All Cities</option>';
+  allCities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
+
+  // Populate bucket dropdown (from parsed buckets)
+  const allBuckets = [...new Set(wsRawRows.flatMap(r => r._buckets.map(b => b.bucket)))].sort();
+  const bSel = document.getElementById('ws-filter-bucket');
+  bSel.innerHTML = '<option value="">All Buckets</option>';
+  allBuckets.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; bSel.appendChild(o); });
+
+  // Sort headers
+  document.querySelectorAll('#ws-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      if (wsState.sortCol === th.dataset.col) {
+        wsState.sortDir = wsState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        wsState.sortCol = th.dataset.col;
+        wsState.sortDir = th.dataset.type === 'num' ? 'desc' : 'asc';
+      }
+      wsState.page = 0;
+      renderWsTable();
+    });
+  });
+
+  ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => { wsState.page = 0; applyWsFilters(); });
+  });
+  document.getElementById('ws-search').addEventListener('input', () => { wsState.page = 0; applyWsFilters(); });
+  document.getElementById('ws-reset-btn').addEventListener('click', () => {
+    ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ws-search').value = '';
+    wsState.page = 0;
+    applyWsFilters();
+  });
+  document.getElementById('ws-download-btn').addEventListener('click', downloadWsCSV);
+
+  applyWsFilters();
+}
+
+function applyWsFilters() {
+  const wVal = document.getElementById('ws-filter-week').value;
+  const cVal = document.getElementById('ws-filter-city').value;
+  const bVal = document.getElementById('ws-filter-bucket').value;
+  const q    = document.getElementById('ws-search').value.toLowerCase().trim();
+
+  wsState.filtered = wsRawRows.filter(r => {
+    if (wVal && r.WEEK !== wVal) return false;
+    if (cVal && r.CITY !== cVal) return false;
+    if (bVal && !r._buckets.some(b => b.bucket === bVal)) return false;
+    if (q) {
+      const hay = `${r.ITEM_NAME} ${r.ITEM_CODE_NEW} ${r.CITY}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderWsKPIs();
+  renderWsTable();
+}
+
+function renderWsKPIs() {
+  const rows = wsState.filtered;
+  const totalIGCC  = rows.reduce((s, r) => s + r['Total IGCC'], 0);
+  const totalCities = new Set(rows.map(r => r.CITY)).size;
+  const weeks      = new Set(rows.map(r => r.WEEK));
+  const itemIGCC   = {}, itemName = {};
+  rows.forEach(r => {
+    itemIGCC[r.ITEM_CODE_NEW] = (itemIGCC[r.ITEM_CODE_NEW] || 0) + r['Total IGCC'];
+    itemName[r.ITEM_CODE_NEW] = r.ITEM_NAME;
+  });
+  const top = Object.entries(itemIGCC).sort((a, b) => b[1] - a[1])[0];
+
+  document.getElementById('ws-kpi-items').textContent    = rows.length.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-igcc').textContent     = totalIGCC.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-igcc-sub').textContent = `${[...weeks].length} week(s)`;
+  document.getElementById('ws-kpi-cities').textContent   = totalCities.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-cities-sub').textContent = `${[...weeks].sort().join(', ').replace(/(\d)/g, 'W$1') || '—'}`;
+  if (top) {
+    document.getElementById('ws-kpi-top').textContent     = itemName[top[0]] || top[0];
+    document.getElementById('ws-kpi-top-sub').textContent = `${top[1].toLocaleString('en-IN')} IGCC`;
+  }
+  document.getElementById('ws-count-label').textContent = `${rows.length.toLocaleString('en-IN')} rows`;
+}
+
+function renderWsTable() {
+  const col   = wsState.sortCol;
+  const dir   = wsState.sortDir;
+  const isNum = document.querySelector(`#ws-table thead th[data-col="${col}"]`)?.dataset.type === 'num';
+
+  const sorted = [...wsState.filtered].sort((a, b) => {
+    const av = isNum ? (parseFloat(a[col]) || 0) : String(a[col] || '').toLowerCase();
+    const bv = isNum ? (parseFloat(b[col]) || 0) : String(b[col] || '').toLowerCase();
+    if (av < bv) return dir === 'asc' ? -1 : 1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
+    return b['Total IGCC'] - a['Total IGCC'];
+  });
+
+  document.querySelectorAll('#ws-table thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === col);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = th.dataset.col === col ? (dir === 'asc' ? '↑' : '↓') : '↕';
+  });
+
+  const total  = sorted.length;
+  const pages  = Math.max(1, Math.ceil(total / WS_PAGE_SIZE));
+  wsState.page = Math.min(wsState.page, pages - 1);
+  const start  = wsState.page * WS_PAGE_SIZE;
+  const slice  = sorted.slice(start, start + WS_PAGE_SIZE);
+
+  const tbody = document.getElementById('ws-tbody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const pillsHtml = r._buckets.map(b => {
+        const color = BUCKET_COLORS[b.bucket] || '#888';
+        return `<span class="bkt-pill" style="background:${color}22;color:${color};border:1px solid ${color}55;">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};"></span>
+          ${b.bucket} <b>(${b.count})</b>
+        </span>`;
+      }).join('');
+      const igccColor = r['Total IGCC'] > 50 ? '#f87171' : r['Total IGCC'] > 20 ? '#fbbf24' : 'var(--text)';
+      return `<tr>
+        <td class="num" style="font-weight:700;">W${r.WEEK}</td>
+        <td>${r.CITY}</td>
+        <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
+        <td style="font-weight:500;min-width:180px;">${r.ITEM_NAME}</td>
+        <td class="num" style="color:${igccColor};font-weight:700;">${r['Total IGCC'].toLocaleString('en-IN')}</td>
+        <td style="min-width:320px;line-height:1.8;">${pillsHtml || '<span style="color:var(--muted);">—</span>'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('ws-page-info').textContent = total
+    ? `Showing ${(start + 1).toLocaleString('en-IN')}–${Math.min(start + WS_PAGE_SIZE, total).toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}`
+    : 'No results';
+
+  const pag = document.getElementById('ws-pagination');
+  pag.innerHTML = '';
+  const maxBtns = 7;
+  let pStart = Math.max(0, wsState.page - Math.floor(maxBtns / 2));
+  let pEnd   = Math.min(pages - 1, pStart + maxBtns - 1);
+  if (pEnd - pStart < maxBtns - 1) pStart = Math.max(0, pEnd - maxBtns + 1);
+  if (wsState.page > 0) { const b = document.createElement('button'); b.className = 'page-btn'; b.textContent = '←'; b.onclick = () => { wsState.page--; renderWsTable(); }; pag.appendChild(b); }
+  for (let i = pStart; i <= pEnd; i++) {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (i === wsState.page ? ' active' : '');
+    b.textContent = i + 1;
+    b.onclick = ((pi) => () => { wsState.page = pi; renderWsTable(); })(i);
+    pag.appendChild(b);
+  }
+  if (wsState.page < pages - 1) { const b = document.createElement('button'); b.className = 'page-btn'; b.textContent = '→'; b.onclick = () => { wsState.page++; renderWsTable(); }; pag.appendChild(b); }
+}
+
+function downloadWsCSV() {
+  const cols = ['WEEK', 'CITY', 'ITEM_CODE_NEW', 'ITEM_NAME', 'Total IGCC', 'Reason Summary'];
+  const lines = [cols.join(',')];
+  wsState.filtered.forEach(r => {
+    lines.push(cols.map(c => {
+      const v = String(r[c] ?? '');
+      return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_weekly_summary.csv'; a.click();
+}
 
 // ─────────────────────────────────────────────
 // ITEM TAB — daily CSV, date filter, cascading dropdowns, SPOC %
