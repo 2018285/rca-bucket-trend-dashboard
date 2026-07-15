@@ -1928,38 +1928,58 @@ function downloadPivotCSV() {
 
 function downloadCwtCSV() {
   if (!_lastCwtData) return;
-  const { rows } = _lastCwtData;
+  const { rows } = _lastCwtData;   // already filtered by active global dropdowns
   const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
+
+  // unic per week+city
   const wcUnic = {};
   rows.forEach(r => {
     const k = `${r.week}|${r.city}`;
     if (!wcUnic[k]) wcUnic[k] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
   });
-  // one row per city+bucket+spoc combination
+
+  // group by current Group By toggle (bucket or spoc)
+  const groupField = _cwtGroupBy === 'bucket' ? 'bucket' : 'spoc';
+  const groupLabel = _cwtGroupBy === 'bucket' ? 'RCA Bucket' : 'SPOC';
+
   const keyMap = {};
   rows.forEach(r => {
-    const k = `${r.city}||${r.bucket}||${r.spoc}`;
-    if (!keyMap[k]) keyMap[k] = { city: r.city, bucket: r.bucket, spoc: r.spoc, wIGCC: {} };
+    const grpVal = r[groupField];
+    const k = `${r.city}||${grpVal}`;
+    if (!keyMap[k]) keyMap[k] = { city: r.city, group: grpVal, wIGCC: {} };
     keyMap[k].wIGCC[r.week] = (keyMap[k].wIGCC[r.week] || 0) + r.igcc;
   });
-  const headers = ['City', 'RCA Bucket', 'SPOC',
-    ...weeks.map(w => `W${w} IGCC`),
-    ...weeks.map(w => `W${w} Rate%`),
+
+  const cityTotal = {};
+  rows.forEach(r => { cityTotal[r.city] = (cityTotal[r.city] || 0) + r.igcc; });
+
+  const headers = ['City', groupLabel,
+    ...weeks.flatMap(w => [`W${w} IGCC`, `W${w} Rate%`]),
     'Total IGCC', 'Overall Rate%'];
+
   const csvRows = [headers];
-  Object.values(keyMap).sort((a,b) => a.city.localeCompare(b.city)).forEach(rec => {
-    const totalIGCC = weeks.reduce((s,w) => s + (rec.wIGCC[w]||0), 0);
-    const totalUnic = weeks.reduce((s,w) => s + (wcUnic[`${w}|${rec.city}`]||0), 0);
-    const rate = totalUnic > 0 ? (totalIGCC/totalUnic*100).toFixed(3) : '';
-    csvRows.push([rec.city, rec.bucket, rec.spoc,
-      ...weeks.map(w => rec.wIGCC[w]||0),
-      ...weeks.map(w => { const u=wcUnic[`${w}|${rec.city}`]||0; const i=rec.wIGCC[w]||0; return u>0?(i/u*100).toFixed(3):''; }),
-      totalIGCC, rate
-    ]);
-  });
+  Object.values(keyMap)
+    .sort((a,b) => (cityTotal[b.city]||0) - (cityTotal[a.city]||0) || a.group.localeCompare(b.group))
+    .forEach(rec => {
+      const totalIGCC = weeks.reduce((s,w) => s + (rec.wIGCC[w]||0), 0);
+      const totalUnic = weeks.reduce((s,w) => s + (wcUnic[`${w}|${rec.city}`]||0), 0);
+      const overallRate = totalUnic > 0 ? (totalIGCC / totalUnic * 100).toFixed(3) : '';
+      csvRows.push([
+        rec.city, rec.group,
+        ...weeks.flatMap(w => {
+          const igcc = rec.wIGCC[w] || 0;
+          const unic = wcUnic[`${w}|${rec.city}`] || 0;
+          const rate = unic > 0 ? (igcc / unic * 100).toFixed(3) : '';
+          return [igcc, rate];
+        }),
+        totalIGCC, overallRate
+      ]);
+    });
+
   const csv = Papa.unparse(csvRows);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_city_week_trend.csv'; a.click();
+  const fname = `rca_city_week_${groupField}_trend.csv`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
 }
 
 // ─────────────────────────────────────────────
