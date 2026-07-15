@@ -166,6 +166,96 @@
   .pivot-cell-igcc { font-weight: 700; font-size: 14px; line-height: 1.2; }
   .pivot-cell-rate { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
+  /* City × Week trend table */
+  .cwt-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  .cwt-table th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 9px 12px; border: 1px solid var(--border); text-align: center; z-index: 2;
+  }
+  .cwt-table th.cwt-city { left: 0; z-index: 3; text-align: left; min-width: 140px; }
+  .cwt-table td { padding: 7px 10px; border: 1px solid rgba(255,255,255,0.05); text-align: center; vertical-align: middle; }
+  .cwt-table td.cwt-city {
+    position: sticky; left: 0; background: var(--surface); color: var(--text);
+    font-weight: 600; text-align: left; font-size: 12px; z-index: 1; min-width: 140px;
+  }
+  .cwt-table tbody tr:hover td { background: rgba(255,255,255,0.04); }
+  .cwt-table tbody tr:hover td.cwt-city { background: var(--surface2); }
+  .cwt-table tfoot td {
+    background: var(--surface2); font-weight: 700;
+    border-top: 2px solid var(--border); padding: 9px 12px; text-align: center;
+  }
+  .cwt-table tfoot td.cwt-city { position: sticky; left: 0; background: var(--surface2); z-index: 1; color: #fff; }
+  .cwt-rate { font-size: 12px; font-weight: 700; line-height: 1.2; }
+  .cwt-arrow { font-size: 10px; margin-left: 3px; }
+  .arr-up   { color: #ef4444; }
+  .arr-dn   { color: #10b981; }
+  .arr-flat { color: #94a3b8; }
+
+  /* Tabs */
+  .tab-nav { display: flex; gap: 4px; border-bottom: 2px solid var(--border); margin-bottom: 18px; }
+  .tab-btn {
+    padding: 9px 20px; border: none; background: transparent; color: var(--muted);
+    font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -2px; border-radius: 6px 6px 0 0; transition: all 0.15s; white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); background: var(--surface2); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: transparent; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Item detail tab */
+  .item-filters-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .item-filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .item-filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .item-filter-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .item-sel { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; color: var(--text); font-size: 13px; outline: none; min-width: 130px; }
+  .item-sel:focus { border-color: var(--primary); }
+  .item-date-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; color: var(--text); font-size: 13px; outline: none; width: 140px; color-scheme: dark; }
+  .item-date-input:focus { border-color: var(--primary); }
+  .item-search { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; color: var(--text); font-size: 13px; outline: none; min-width: 220px; flex: 1; }
+  .item-search:focus { border-color: var(--primary); }
+  .item-search::placeholder { color: var(--muted); }
+  .item-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .item-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+
+  /* SPOC % summary bar */
+  .spoc-summary-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .spoc-summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 140px; border-left: 3px solid; }
+  .spoc-summary-card .ss-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .spoc-summary-card .ss-pct  { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; }
+  .spoc-summary-card .ss-sub  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .spoc-summary-card .ss-bar  { height: 4px; border-radius: 2px; margin-top: 8px; background: var(--border); }
+  .spoc-summary-card .ss-fill { height: 100%; border-radius: 2px; }
+
+  .item-table-wrap { overflow: auto; max-height: 520px; }
+  .item-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  .item-table thead th {
+    position: sticky; top: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 9px 12px; border-bottom: 2px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  .item-table thead th:hover { color: var(--text); }
+  .item-table thead th.sorted { color: var(--primary); }
+  .item-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .item-table tbody tr:hover { background: var(--surface2); }
+  .item-table tbody td { padding: 8px 12px; color: var(--text); }
+  .item-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .item-page-bar { display: flex; gap: 6px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .item-page-info { font-size: 12px; color: var(--muted); flex: 1; }
+
+  /* Item sub-tabs */
+  .item-subtab-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .item-subtab-btn { padding: 6px 16px; border: none; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 5px 5px 0 0; transition: all 0.15s; }
+  .item-subtab-btn:hover { color: var(--text); background: var(--surface2); }
+  .item-subtab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .item-subpane { display: none; }
+  .item-subpane.active { display: block; }
+  /* Bucket pills for weekly summary */
+  .bkt-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 600; margin: 1px; white-space: nowrap; }
+  .ws-error-panel { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+  .ws-source-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+
   /* Footer */
   .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 16px 0; border-top: 1px solid var(--border); }
 
@@ -202,6 +292,15 @@
     </div>
   </div>
 
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="tab-trend">Trend Dashboard</button>
+    <button class="tab-btn" data-tab="tab-items">Item-wise Details</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════ TAB 1: TREND ═══════════════════════════════════════ -->
+  <div id="tab-trend" class="tab-pane active">
+
   <!-- Filters -->
   <div class="filters-bar">
     <div class="filter-group">
@@ -236,6 +335,22 @@
     </div>
     <div class="table-scroll" style="max-height:340px;margin-top:12px;">
       <div id="summary-container"></div>
+    </div>
+  </div>
+
+  <!-- City × SPOC Weekly Trend Table -->
+  <div class="table-section" style="margin-bottom:16px;">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        City × SPOC Weekly IGCC Rate Trend
+        <span class="badge" id="city-week-badge">—</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp; vs prior week &nbsp;|&nbsp; click city to expand/collapse</span>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:520px;margin-top:12px;">
+      <div id="city-week-trend-container"></div>
     </div>
   </div>
 
@@ -320,6 +435,222 @@
   </div>
 
   <div class="footer">RCA Bucket Trend Dashboard &nbsp;|&nbsp; IGCC Rate = IGCC ÷ UNIC Orders (unique orders per Week+City)</div>
+
+  </div><!-- /tab-trend -->
+
+  <!-- ═══════════════════════════════════════ TAB 2: ITEM DETAILS ═══════════════════════════════════════ -->
+  <div id="tab-items" class="tab-pane">
+
+    <!-- Inner sub-tab nav -->
+    <div class="item-subtab-nav">
+      <button class="item-subtab-btn active" data-subtab="subtab-weekly">Weekly Summary (Article wise)</button>
+      <button class="item-subtab-btn" data-subtab="subtab-daily">Daily Detail</button>
+    </div>
+
+    <!-- ── SUB-TAB: WEEKLY SUMMARY ── -->
+    <div id="subtab-weekly" class="item-subpane active">
+
+      <!-- Source bar + error panel -->
+      <div class="ws-source-bar" id="ws-source-bar" style="display:none;">
+        <span style="color:var(--success);">&#10003;</span>
+        <span id="ws-source-text">Loaded from Google Sheet</span>
+        <span style="margin-left:auto;"><button class="btn btn-outline" id="ws-reload-btn" style="font-size:11px;padding:4px 10px;">&#8635; Reload</button></span>
+      </div>
+      <div id="ws-error-panel" class="ws-error-panel" style="display:none;">
+        <div style="color:#f87171;font-weight:700;margin-bottom:8px;">&#9888; Could not load from Google Sheet</div>
+        <div id="ws-error-msg" style="color:var(--muted);font-size:12px;margin-bottom:10px;"></div>
+        <div style="font-size:12px;color:var(--muted);">
+          To fix: open the Google Sheet → <b>File → Share → Publish to web</b> → publish <b>"WeeklyRCA-Summary"</b> as CSV, then reload this page.
+          <a href="https://docs.google.com/spreadsheets/d/1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk/edit" target="_blank" style="color:var(--primary);margin-left:6px;">Open Sheet ↗</a>
+        </div>
+      </div>
+
+      <!-- Weekly Summary Filters bar -->
+      <div class="item-filters-bar" id="ws-filters-bar">
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>Week</label>
+            <select class="item-sel" id="ws-filter-week"><option value="">All Weeks</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>City</label>
+            <select class="item-sel" id="ws-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>RCA Bucket</label>
+            <select class="item-sel" id="ws-filter-bucket" style="min-width:200px;width:100%;"><option value="">All Buckets</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:2;">
+            <label>Search Item</label>
+            <input class="item-search" id="ws-search" type="text" placeholder="Item name or code...">
+          </div>
+          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
+            <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+            <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+            <span class="item-count" id="ws-count-label" style="line-height:34px;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weekly KPI row -->
+      <div class="item-kpi-row" id="ws-kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Items</div>
+          <div class="kpi-value" id="ws-kpi-items">—</div>
+          <div class="kpi-sub">unique article entries</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">Total IGCC</div>
+          <div class="kpi-value" id="ws-kpi-igcc">—</div>
+          <div class="kpi-sub" id="ws-kpi-igcc-sub">—</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-label">Cities</div>
+          <div class="kpi-value" id="ws-kpi-cities">—</div>
+          <div class="kpi-sub" id="ws-kpi-cities-sub">—</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Top Item (IGCC)</div>
+          <div class="kpi-value" id="ws-kpi-top" style="font-size:13px;line-height:1.3;">—</div>
+          <div class="kpi-sub" id="ws-kpi-top-sub">—</div>
+        </div>
+      </div>
+
+      <!-- Weekly Summary Table -->
+      <div class="table-section" style="padding:0;background:transparent;border:none;">
+        <div class="item-table-wrap">
+          <table class="item-table" id="ws-table">
+            <thead>
+              <tr>
+                <th data-col="WEEK"          data-type="num">Week <span class="sort-icon">↕</span></th>
+                <th data-col="CITY"          data-type="str">City <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
+                <th data-col="Total IGCC"    data-type="num">Total IGCC <span class="sort-icon">↕</span></th>
+                <th style="min-width:340px;">RCA Bucket Breakdown</th>
+              </tr>
+            </thead>
+            <tbody id="ws-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Loading weekly summary from Google Sheet…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="item-page-bar">
+          <span class="item-page-info" id="ws-page-info">—</span>
+          <div class="pagination" id="ws-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /subtab-weekly -->
+
+    <!-- ── SUB-TAB: DAILY DETAIL ── -->
+    <div id="subtab-daily" class="item-subpane">
+
+      <!-- Filters bar -->
+      <div class="item-filters-bar">
+        <!-- Row 1: Date range + Week + Search -->
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>Date From</label>
+            <input class="item-date-input" type="date" id="item-date-from">
+          </div>
+          <div class="item-filter-group">
+            <label>Date To</label>
+            <input class="item-date-input" type="date" id="item-date-to">
+          </div>
+          <div class="item-filter-group">
+            <label>Week</label>
+            <select class="item-sel" id="item-filter-week"><option value="">All Weeks</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>Search</label>
+            <input class="item-search" id="item-search" type="text" placeholder="Item name, code, city, SPOC, bucket...">
+          </div>
+          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
+            <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+            <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+            <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
+          </div>
+        </div>
+        <!-- Row 2: City + SPOC + Bucket (dynamic / cascading) -->
+        <div class="item-filter-row">
+          <div class="item-filter-group">
+            <label>City</label>
+            <select class="item-sel" id="item-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>SPOC</label>
+            <select class="item-sel" id="item-filter-spoc"><option value="">All SPOCs</option></select>
+          </div>
+          <div class="item-filter-group" style="flex:1;">
+            <label>RCA Bucket</label>
+            <select class="item-sel" id="item-filter-bucket" style="min-width:220px;width:100%;"><option value="">All Buckets</option></select>
+          </div>
+          <div class="item-filter-group">
+            <label>Item Name</label>
+            <select class="item-sel" id="item-filter-item" style="min-width:180px;"><option value="">All Items</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="item-kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Rows</div>
+          <div class="kpi-value" id="item-kpi-rows">—</div>
+          <div class="kpi-sub" id="item-kpi-rows-sub">filtered records</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">Total IGCC</div>
+          <div class="kpi-value" id="item-kpi-igcc">—</div>
+          <div class="kpi-sub" id="item-kpi-igcc-sub">—</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-label">Total Orders</div>
+          <div class="kpi-value" id="item-kpi-orders">—</div>
+          <div class="kpi-sub" id="item-kpi-orders-sub">IGCC Rate: <span id="item-kpi-rate">—</span></div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Top Item (IGCC)</div>
+          <div class="kpi-value" id="item-kpi-top" style="font-size:13px;line-height:1.3;">—</div>
+          <div class="kpi-sub" id="item-kpi-top-sub">—</div>
+        </div>
+      </div>
+
+      <!-- SPOC % summary bar -->
+      <div class="spoc-summary-bar" id="spoc-summary-bar"></div>
+
+      <!-- Detail Table -->
+      <div class="table-section" style="padding:0;background:transparent;border:none;">
+        <div class="item-table-wrap">
+          <table class="item-table" id="item-table">
+            <thead>
+              <tr>
+                <th data-col="WEEK"  data-type="num">Week <span class="sort-icon">↕</span></th>
+                <th data-col="CITY"  data-type="str">City <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
+                <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
+                <th data-col="Basic Reason for IGCC" data-type="str">RCA Bucket <span class="sort-icon">↕</span></th>
+                <th data-col="SPOC"  data-type="str">SPOC <span class="sort-icon">↕</span></th>
+                <th data-col="IGCC"  data-type="num">IGCC <span class="sort-icon">↕</span></th>
+                <th data-col="ORDERS" data-type="num">Orders <span class="sort-icon">↕</span></th>
+                <th data-col="inc_%" data-type="num">Inc % <span class="sort-icon">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="item-tbody"></tbody>
+          </table>
+        </div>
+        <div class="item-page-bar">
+          <span class="item-page-info" id="item-page-info">—</span>
+          <div class="pagination" id="item-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /subtab-daily -->
+
+  </div><!-- /tab-items -->
+
+  <div class="footer">RCA Bucket Trend Dashboard &nbsp;|&nbsp; IGCC Rate = IGCC ÷ UNIC Orders (unique orders per Week+City)</div>
 </div>
 
 <script>
@@ -366,10 +697,15 @@ Chart.defaults.font.size = 12;
 // ─────────────────────────────────────────────
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
+let rawItemRows = [];       // raw rows from Item_level_weekly.csv
 let filterState = { weeks: [], cities: [], spocs: [], buckets: [] };
 let charts = {};
 let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
 const PAGE_SIZE = 100;
+
+// Item tab state
+let itemState = { sortCol: 'IGCC', sortDir: 'desc', page: 0, filtered: [], inited: false };
+const ITEM_PAGE_SIZE = 100;
 
 // Tom Select instances
 let tsWeek, tsCity, tsSpoc, tsBucket;
@@ -438,6 +774,18 @@ async function loadData() {
             cubeMap[key] = { week, city, bucket, spoc, igcc: 0 };
           }
           cubeMap[key].igcc += igcc;
+          // store raw row for item tab
+          rawItemRows.push({
+            WEEK: week,
+            CITY: city,
+            ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
+            ITEM_NAME: String(row.ITEM_NAME || '').trim(),
+            'Basic Reason for IGCC': bucket,
+            SPOC: spoc,
+            IGCC: igcc,
+            ORDERS: parseInt(row.ORDERS, 10) || 0,
+            'inc_%': String(row['inc_%'] || '').trim()
+          });
         });
         resolve();
       },
@@ -534,6 +882,7 @@ function onFilterChange() {
   const rows = getFilteredRows();
   const agg  = computeAggregates(rows);
   renderSummaryTable(rows);
+  renderCityWeekTrend(rows);
   renderKPIs(agg);
   updateAllCharts(agg, rows);
   renderPivotTable(rows);
@@ -982,6 +1331,203 @@ function renderHeatmap(agg) {
 }
 
 // ─────────────────────────────────────────────
+// CITY × SPOC WEEKLY TREND TABLE
+// ─────────────────────────────────────────────
+function renderCityWeekTrend(rows) {
+  const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
+  const presentSpocs = SPOC_ORDER.filter(s => rows.some(r => r.spoc === s));
+  const spocs = presentSpocs.length ? presentSpocs : SPOC_ORDER;
+
+  // unic per week+city (for rate denominator)
+  const wcUnic = {};
+  rows.forEach(r => {
+    const k = `${r.week}|${r.city}`;
+    if (!wcUnic[k]) wcUnic[k] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+  });
+
+  // unic per week (city-deduplicated total)
+  const weekUnic = {};
+  rows.forEach(r => {
+    if (!weekUnic[r.week]) weekUnic[r.week] = { seen: new Set(), total: 0 };
+    if (!weekUnic[r.week].seen.has(r.city)) {
+      weekUnic[r.week].seen.add(r.city);
+      weekUnic[r.week].total += wcUnic[`${r.week}|${r.city}`] || 0;
+    }
+  });
+
+  // igcc per week+city+spoc
+  const wcsIGCC = {};
+  rows.forEach(r => {
+    if (!r.spoc || r.spoc === '<NA>') return;
+    const k = `${r.week}|${r.city}|${r.spoc}`;
+    wcsIGCC[k] = (wcsIGCC[k] || 0) + r.igcc;
+  });
+
+  // igcc per week+city (total across spocs)
+  const wcIGCC = {};
+  rows.forEach(r => {
+    const k = `${r.week}|${r.city}`;
+    wcIGCC[k] = (wcIGCC[k] || 0) + r.igcc;
+  });
+
+  // total igcc per city (for city-level sort)
+  const cityTotalIGCC = {};
+  rows.forEach(r => { cityTotalIGCC[r.city] = (cityTotalIGCC[r.city] || 0) + r.igcc; });
+  const cities = [...new Set(rows.map(r => r.city))].sort((a,b) => (cityTotalIGCC[b]||0) - (cityTotalIGCC[a]||0));
+
+  // grand totals per week for footer
+  const weekTotals = {};
+  weeks.forEach(w => {
+    weekTotals[w] = { igcc: 0, unic: weekUnic[w] ? weekUnic[w].total : 0 };
+    rows.forEach(r => { if (r.week === w) weekTotals[w].igcc += r.igcc; });
+  });
+
+  document.getElementById('city-week-badge').textContent = `${cities.length} cities × ${spocs.length} SPOCs × ${weeks.length} weeks`;
+
+  // helper: arrow symbol
+  function arrow(cur, prev) {
+    if (prev === null || cur === null) return '';
+    if (cur > prev * 1.02) return `<span class="cwt-arrow arr-up">▲</span>`;
+    if (cur < prev * 0.98) return `<span class="cwt-arrow arr-dn">▼</span>`;
+    return `<span class="cwt-arrow arr-flat">●</span>`;
+  }
+
+  // helper: cell bg & text colour by rate severity
+  function rateStyle(rate) {
+    const bg    = rate > 2 ? 'rgba(239,68,68,0.14)' : rate > 1 ? 'rgba(245,158,11,0.11)' : 'transparent';
+    const color = rate > 2 ? '#f87171'              : rate > 1 ? '#fbbf24'                : '#94a3b8';
+    return { bg, color };
+  }
+
+  let html = '<table class="cwt-table"><thead><tr>';
+  html += '<th class="cwt-city" style="min-width:160px;">City / SPOC</th>';
+  weeks.forEach(w => { html += `<th>W${w}</th>`; });
+  html += '<th style="color:var(--warning);white-space:nowrap;">Overall Rate</th>';
+  html += '</tr></thead><tbody>';
+
+  cities.forEach(city => {
+    // ── City total row (city-level rate uses city unic, total igcc across all spocs) ──
+    let cityTotalAllWeeksIGCC = 0, cityTotalAllWeeksUNIC = 0;
+    const seenWCity = {};
+    rows.filter(r => r.city === city).forEach(r => {
+      cityTotalAllWeeksIGCC += r.igcc;
+      if (!seenWCity[r.week]) {
+        seenWCity[r.week] = 1;
+        cityTotalAllWeeksUNIC += wcUnic[`${r.week}|${city}`] || 0;
+      }
+    });
+    const cityOverallRate = cityTotalAllWeeksUNIC > 0 ? (cityTotalAllWeeksIGCC / cityTotalAllWeeksUNIC * 100) : null;
+    const coCls = cityOverallRate !== null ? (cityOverallRate > 2 ? 'rate-high' : cityOverallRate > 1 ? 'rate-med' : 'rate-low') : '';
+
+    html += `<tr class="cwt-city-hdr" onclick="cwtToggle(this)" style="cursor:pointer;background:var(--surface2);">`;
+    html += `<td class="cwt-city" style="font-weight:700;font-size:13px;color:#e2e8f0;">
+      <span class="cwt-toggle" style="font-size:10px;margin-right:6px;color:var(--muted);">▶</span>${city}
+    </td>`;
+    weeks.forEach((w, wi) => {
+      const unic = wcUnic[`${w}|${city}`] || 0;
+      const igcc = wcIGCC[`${w}|${city}`] || 0;
+      const rate = unic > 0 ? (igcc / unic * 100) : null;
+      let prevRate = null;
+      if (wi > 0) {
+        const pu = wcUnic[`${weeks[wi-1]}|${city}`] || 0;
+        const pi = wcIGCC[`${weeks[wi-1]}|${city}`] || 0;
+        prevRate = pu > 0 ? (pi / pu * 100) : null;
+      }
+      if (rate === null) {
+        html += `<td style="color:#3a4060;">—</td>`;
+      } else {
+        const { bg, color } = rateStyle(rate);
+        html += `<td style="background:${bg};" title="${city} | W${w} | Rate: ${rate.toFixed(3)}%">
+          <span class="cwt-rate" style="color:${color};font-size:13px;">${rate.toFixed(2)}%</span>${arrow(rate, prevRate)}
+        </td>`;
+      }
+    });
+    html += `<td><span class="rate-badge ${coCls}">${cityOverallRate !== null ? cityOverallRate.toFixed(3)+'%' : '—'}</span></td>`;
+    html += `</tr>`;
+
+    // ── SPOC sub-rows (hidden by default) ──
+    spocs.forEach(spoc => {
+      const spocColor = SPOC_COLORS[spoc] || '#888';
+      let spocTotalIGCC = 0;
+      weeks.forEach(w => { spocTotalIGCC += wcsIGCC[`${w}|${city}|${spoc}`] || 0; });
+      if (spocTotalIGCC === 0) return; // skip spocs with no data for this city
+
+      const spocOverallRate = cityTotalAllWeeksUNIC > 0 ? (spocTotalIGCC / cityTotalAllWeeksUNIC * 100) : null;
+      const soCls = spocOverallRate !== null ? (spocOverallRate > 2 ? 'rate-high' : spocOverallRate > 1 ? 'rate-med' : 'rate-low') : '';
+
+      html += `<tr class="cwt-spoc-row" style="display:none;">`;
+      html += `<td class="cwt-city" style="padding-left:28px;color:${spocColor};font-size:12px;">
+        <span style="margin-right:5px;opacity:0.5;">└</span>${spoc}
+      </td>`;
+      weeks.forEach((w, wi) => {
+        const unic = wcUnic[`${w}|${city}`] || 0;
+        const igcc = wcsIGCC[`${w}|${city}|${spoc}`] || 0;
+        const rate = unic > 0 && igcc > 0 ? (igcc / unic * 100) : null;
+        let prevRate = null;
+        if (wi > 0) {
+          const pu = wcUnic[`${weeks[wi-1]}|${city}`] || 0;
+          const pi = wcsIGCC[`${weeks[wi-1]}|${city}|${spoc}`] || 0;
+          prevRate = pu > 0 && pi > 0 ? (pi / pu * 100) : null;
+        }
+        if (rate === null) {
+          html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
+        } else {
+          const { bg, color } = rateStyle(rate);
+          html += `<td style="background:${bg};" title="${city} | ${spoc} | W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate.toFixed(3)}%">
+            <div class="cwt-rate" style="color:${color};font-size:12px;">${rate.toFixed(2)}%</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px;">${igcc.toLocaleString('en-IN')}${arrow(rate, prevRate)}</div>
+          </td>`;
+        }
+      });
+      html += `<td><span class="rate-badge ${soCls}">${spocOverallRate !== null ? spocOverallRate.toFixed(3)+'%' : '—'}</span></td>`;
+      html += `</tr>`;
+    });
+  });
+
+  // ── Grand footer ──
+  html += '</tbody><tfoot><tr>';
+  html += '<td class="cwt-city" style="font-weight:700;color:#fff;">ALL CITIES</td>';
+  let gIGCC = 0, gUNIC = 0;
+  const seenWCAll = {};
+  rows.forEach(r => {
+    gIGCC += r.igcc;
+    const k = `${r.week}|${r.city}`;
+    if (!seenWCAll[k]) { seenWCAll[k] = 1; gUNIC += wcUnic[k] || 0; }
+  });
+  weeks.forEach((w, wi) => {
+    const d = weekTotals[w];
+    const rate = d.unic > 0 ? (d.igcc / d.unic * 100) : null;
+    let prevRate = null;
+    if (wi > 0) {
+      const pd = weekTotals[weeks[wi-1]];
+      prevRate = pd.unic > 0 ? (pd.igcc / pd.unic * 100) : null;
+    }
+    if (rate === null) { html += `<td>—</td>`; return; }
+    const { bg, color } = rateStyle(rate);
+    html += `<td style="background:${bg};">
+      <span class="cwt-rate" style="color:${color}">${rate.toFixed(2)}%</span>${arrow(rate, prevRate)}
+    </td>`;
+  });
+  const gRate = gUNIC > 0 ? (gIGCC / gUNIC * 100) : null;
+  const gCls  = gRate !== null ? (gRate > 2 ? 'rate-high' : gRate > 1 ? 'rate-med' : 'rate-low') : '';
+  html += `<td><span class="rate-badge ${gCls}">${gRate !== null ? gRate.toFixed(3)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('city-week-trend-container').innerHTML = html;
+}
+
+function cwtToggle(cityRow) {
+  const toggle = cityRow.querySelector('.cwt-toggle');
+  let el = cityRow.nextElementSibling;
+  let expanded = toggle.textContent.trim() === '▼';
+  while (el && el.classList.contains('cwt-spoc-row')) {
+    el.style.display = expanded ? 'none' : '';
+    el = el.nextElementSibling;
+  }
+  toggle.textContent = expanded ? '▶' : '▼';
+}
+
+// ─────────────────────────────────────────────
 // SUMMARY TABLE: City × SPOC
 // ─────────────────────────────────────────────
 function buildCitySpocData(rows) {
@@ -1329,6 +1875,629 @@ function downloadPivotCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = 'rca_week_spoc_pivot.csv';
   a.click();
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tab-items') {
+      // load weekly summary on first open (it's the default sub-tab)
+      if (!wsState.inited) loadWeeklySummary();
+    }
+  });
+});
+
+// Inner sub-tab switching
+document.querySelectorAll('.item-subtab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.item-subtab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.item-subpane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.subtab).classList.add('active');
+    if (btn.dataset.subtab === 'subtab-daily' && !itemState.inited) {
+      loadDailyData();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────
+// WEEKLY SUMMARY — loads from Google Sheet CSV export
+// ─────────────────────────────────────────────
+const WS_SHEET_ID = '1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk';
+const WS_GID      = '0'; // WeeklyRCA-Summary tab (first tab)
+const WS_CSV_URL  = `https://docs.google.com/spreadsheets/d/${WS_SHEET_ID}/export?format=csv&gid=${WS_GID}`;
+
+let wsRawRows  = [];  // parsed rows from Google Sheet
+let wsState    = { inited: false, sortCol: 'Total IGCC', sortDir: 'desc', page: 0, filtered: [] };
+const WS_PAGE_SIZE = 100;
+
+function parseReasonSummary(text) {
+  // "External Damage/Bruises (22.00), Shrivelled / Dry (6.00)" → [{bucket, count}]
+  if (!text) return [];
+  const out = [];
+  const re = /([^,(]+)\s*\((\d+(?:\.\d+)?)\)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const bucket = m[1].trim().replace(/^<|>$/g, '');
+    const count  = Math.round(parseFloat(m[2]));
+    if (bucket && count > 0) out.push({ bucket, count });
+  }
+  return out;
+}
+
+async function loadWeeklySummary() {
+  wsState.inited = true;
+  document.getElementById('ws-tbody').innerHTML =
+    `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Loading from Google Sheet…</td></tr>`;
+
+  try {
+    await new Promise((resolve, reject) => {
+      Papa.parse(WS_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: ({ data, errors }) => {
+          if (!data.length && errors.length) { reject(new Error(errors[0].message)); return; }
+          wsRawRows = data.map(row => ({
+            'Unique ID':            String(row['Unique ID'] || '').trim(),
+            WEEK:                   String(row.WEEK || row['﻿WEEK'] || '').trim(),
+            CITY:                   String(row.CITY || '').trim(),
+            ITEM_CODE_NEW:          String(row.ITEM_CODE_NEW || '').trim(),
+            ITEM_NAME:              String(row.ITEM_NAME || '').trim(),
+            'Total IGCC':           parseInt(row['Total IGCC'], 10) || 0,
+            'Unique Order Numbers': parseInt(row['Unique Order Numbers'], 10) || 0,
+            'Reason Summary':       String(row['Reason Summary'] || '').trim(),
+            _buckets:               parseReasonSummary(String(row['Reason Summary'] || '').trim())
+          })).filter(r => r.WEEK && r.CITY);
+          resolve();
+        },
+        error: (err) => reject(new Error(err.message || 'Fetch failed'))
+      });
+    });
+
+    document.getElementById('ws-error-panel').style.display  = 'none';
+    document.getElementById('ws-source-bar').style.display   = 'flex';
+    document.getElementById('ws-source-text').textContent    = `Loaded ${wsRawRows.length.toLocaleString('en-IN')} rows from Google Sheet`;
+    initWsSummaryTab();
+
+  } catch (err) {
+    document.getElementById('ws-error-panel').style.display  = 'block';
+    document.getElementById('ws-source-bar').style.display   = 'none';
+    document.getElementById('ws-error-msg').textContent      = err.message;
+    document.getElementById('ws-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted);">Failed to load data — see instructions above.</td></tr>`;
+  }
+}
+
+document.getElementById('ws-reload-btn').addEventListener('click', () => {
+  wsState.inited = false;
+  wsRawRows = [];
+  loadWeeklySummary();
+});
+
+function initWsSummaryTab() {
+  // Populate week dropdown
+  const allWeeks = [...new Set(wsRawRows.map(r => r.WEEK))].sort((a, b) => +a - +b);
+  const wSel = document.getElementById('ws-filter-week');
+  wSel.innerHTML = '<option value="">All Weeks</option>';
+  allWeeks.forEach(w => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
+
+  // Populate city dropdown
+  const allCities = [...new Set(wsRawRows.map(r => r.CITY))].sort();
+  const cSel = document.getElementById('ws-filter-city');
+  cSel.innerHTML = '<option value="">All Cities</option>';
+  allCities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
+
+  // Populate bucket dropdown (from parsed buckets)
+  const allBuckets = [...new Set(wsRawRows.flatMap(r => r._buckets.map(b => b.bucket)))].sort();
+  const bSel = document.getElementById('ws-filter-bucket');
+  bSel.innerHTML = '<option value="">All Buckets</option>';
+  allBuckets.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; bSel.appendChild(o); });
+
+  // Sort headers
+  document.querySelectorAll('#ws-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      if (wsState.sortCol === th.dataset.col) {
+        wsState.sortDir = wsState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        wsState.sortCol = th.dataset.col;
+        wsState.sortDir = th.dataset.type === 'num' ? 'desc' : 'asc';
+      }
+      wsState.page = 0;
+      renderWsTable();
+    });
+  });
+
+  ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => { wsState.page = 0; applyWsFilters(); });
+  });
+  document.getElementById('ws-search').addEventListener('input', () => { wsState.page = 0; applyWsFilters(); });
+  document.getElementById('ws-reset-btn').addEventListener('click', () => {
+    ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ws-search').value = '';
+    wsState.page = 0;
+    applyWsFilters();
+  });
+  document.getElementById('ws-download-btn').addEventListener('click', downloadWsCSV);
+
+  applyWsFilters();
+}
+
+function applyWsFilters() {
+  const wVal = document.getElementById('ws-filter-week').value;
+  const cVal = document.getElementById('ws-filter-city').value;
+  const bVal = document.getElementById('ws-filter-bucket').value;
+  const q    = document.getElementById('ws-search').value.toLowerCase().trim();
+
+  wsState.filtered = wsRawRows.filter(r => {
+    if (wVal && r.WEEK !== wVal) return false;
+    if (cVal && r.CITY !== cVal) return false;
+    if (bVal && !r._buckets.some(b => b.bucket === bVal)) return false;
+    if (q) {
+      const hay = `${r.ITEM_NAME} ${r.ITEM_CODE_NEW} ${r.CITY}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderWsKPIs();
+  renderWsTable();
+}
+
+function renderWsKPIs() {
+  const rows = wsState.filtered;
+  const totalIGCC  = rows.reduce((s, r) => s + r['Total IGCC'], 0);
+  const totalCities = new Set(rows.map(r => r.CITY)).size;
+  const weeks      = new Set(rows.map(r => r.WEEK));
+  const itemIGCC   = {}, itemName = {};
+  rows.forEach(r => {
+    itemIGCC[r.ITEM_CODE_NEW] = (itemIGCC[r.ITEM_CODE_NEW] || 0) + r['Total IGCC'];
+    itemName[r.ITEM_CODE_NEW] = r.ITEM_NAME;
+  });
+  const top = Object.entries(itemIGCC).sort((a, b) => b[1] - a[1])[0];
+
+  document.getElementById('ws-kpi-items').textContent    = rows.length.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-igcc').textContent     = totalIGCC.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-igcc-sub').textContent = `${[...weeks].length} week(s)`;
+  document.getElementById('ws-kpi-cities').textContent   = totalCities.toLocaleString('en-IN');
+  document.getElementById('ws-kpi-cities-sub').textContent = `${[...weeks].sort().join(', ').replace(/(\d)/g, 'W$1') || '—'}`;
+  if (top) {
+    document.getElementById('ws-kpi-top').textContent     = itemName[top[0]] || top[0];
+    document.getElementById('ws-kpi-top-sub').textContent = `${top[1].toLocaleString('en-IN')} IGCC`;
+  }
+  document.getElementById('ws-count-label').textContent = `${rows.length.toLocaleString('en-IN')} rows`;
+}
+
+function renderWsTable() {
+  const col   = wsState.sortCol;
+  const dir   = wsState.sortDir;
+  const isNum = document.querySelector(`#ws-table thead th[data-col="${col}"]`)?.dataset.type === 'num';
+
+  const sorted = [...wsState.filtered].sort((a, b) => {
+    const av = isNum ? (parseFloat(a[col]) || 0) : String(a[col] || '').toLowerCase();
+    const bv = isNum ? (parseFloat(b[col]) || 0) : String(b[col] || '').toLowerCase();
+    if (av < bv) return dir === 'asc' ? -1 : 1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
+    return b['Total IGCC'] - a['Total IGCC'];
+  });
+
+  document.querySelectorAll('#ws-table thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === col);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = th.dataset.col === col ? (dir === 'asc' ? '↑' : '↓') : '↕';
+  });
+
+  const total  = sorted.length;
+  const pages  = Math.max(1, Math.ceil(total / WS_PAGE_SIZE));
+  wsState.page = Math.min(wsState.page, pages - 1);
+  const start  = wsState.page * WS_PAGE_SIZE;
+  const slice  = sorted.slice(start, start + WS_PAGE_SIZE);
+
+  const tbody = document.getElementById('ws-tbody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const pillsHtml = r._buckets.map(b => {
+        const color = BUCKET_COLORS[b.bucket] || '#888';
+        return `<span class="bkt-pill" style="background:${color}22;color:${color};border:1px solid ${color}55;">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};"></span>
+          ${b.bucket} <b>(${b.count})</b>
+        </span>`;
+      }).join('');
+      const igccColor = r['Total IGCC'] > 50 ? '#f87171' : r['Total IGCC'] > 20 ? '#fbbf24' : 'var(--text)';
+      return `<tr>
+        <td class="num" style="font-weight:700;">W${r.WEEK}</td>
+        <td>${r.CITY}</td>
+        <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
+        <td style="font-weight:500;min-width:180px;">${r.ITEM_NAME}</td>
+        <td class="num" style="color:${igccColor};font-weight:700;">${r['Total IGCC'].toLocaleString('en-IN')}</td>
+        <td style="min-width:320px;line-height:1.8;">${pillsHtml || '<span style="color:var(--muted);">—</span>'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('ws-page-info').textContent = total
+    ? `Showing ${(start + 1).toLocaleString('en-IN')}–${Math.min(start + WS_PAGE_SIZE, total).toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}`
+    : 'No results';
+
+  const pag = document.getElementById('ws-pagination');
+  pag.innerHTML = '';
+  const maxBtns = 7;
+  let pStart = Math.max(0, wsState.page - Math.floor(maxBtns / 2));
+  let pEnd   = Math.min(pages - 1, pStart + maxBtns - 1);
+  if (pEnd - pStart < maxBtns - 1) pStart = Math.max(0, pEnd - maxBtns + 1);
+  if (wsState.page > 0) { const b = document.createElement('button'); b.className = 'page-btn'; b.textContent = '←'; b.onclick = () => { wsState.page--; renderWsTable(); }; pag.appendChild(b); }
+  for (let i = pStart; i <= pEnd; i++) {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (i === wsState.page ? ' active' : '');
+    b.textContent = i + 1;
+    b.onclick = ((pi) => () => { wsState.page = pi; renderWsTable(); })(i);
+    pag.appendChild(b);
+  }
+  if (wsState.page < pages - 1) { const b = document.createElement('button'); b.className = 'page-btn'; b.textContent = '→'; b.onclick = () => { wsState.page++; renderWsTable(); }; pag.appendChild(b); }
+}
+
+function downloadWsCSV() {
+  const cols = ['WEEK', 'CITY', 'ITEM_CODE_NEW', 'ITEM_NAME', 'Total IGCC', 'Reason Summary'];
+  const lines = [cols.join(',')];
+  wsState.filtered.forEach(r => {
+    lines.push(cols.map(c => {
+      const v = String(r[c] ?? '');
+      return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_weekly_summary.csv'; a.click();
+}
+
+// ─────────────────────────────────────────────
+// ITEM TAB — daily CSV, date filter, cascading dropdowns, SPOC %
+// ─────────────────────────────────────────────
+let dailyRows = [];   // raw rows from Item_level_daily.csv
+
+async function loadDailyData() {
+  itemState.inited = true;
+  document.getElementById('item-tbody').innerHTML =
+    `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);">Loading daily data…</td></tr>`;
+
+  await new Promise((resolve, reject) => {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_daily.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: ({ data }) => {
+        dailyRows = data.map(row => ({
+          DT:   String(row.DT || '').trim(),
+          WEEK: String(row.WEEK || row['﻿WEEK'] || '').trim(),
+          CITY: String(row.CITY || '').trim(),
+          ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
+          ITEM_NAME:     String(row.ITEM_NAME || '').trim(),
+          'Basic Reason for IGCC': String(row['Basic Reason for IGCC'] || '').trim() || '<NA>',
+          SPOC:   String(row.SPOC || '').trim() || '<NA>',
+          IGCC:   parseInt(row.IGCC, 10) || 0,
+          ORDERS: parseInt(row.ORDERS, 10) || 0,
+          'inc_%': String(row['inc_%'] || '').trim()
+        })).filter(r => r.DT && r.CITY);
+        resolve();
+      },
+      error: reject
+    });
+  });
+
+  initItemTab();
+}
+
+function initItemTab() {
+  // Set date range defaults from data
+  const dates = dailyRows.map(r => r.DT).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('item-date-from').value = dates[0];
+    document.getElementById('item-date-to').value   = dates[dates.length - 1];
+  }
+
+  // Populate week dropdown (static)
+  const allWeeks = [...new Set(dailyRows.map(r => r.WEEK))].sort((a,b) => +a - +b);
+  const wSel = document.getElementById('item-filter-week');
+  wSel.innerHTML = '<option value="">All Weeks</option>';
+  allWeeks.forEach(w => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
+
+  // Sort header clicks
+  document.querySelectorAll('#item-table thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      if (itemState.sortCol === th.dataset.col) {
+        itemState.sortDir = itemState.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        itemState.sortCol = th.dataset.col;
+        itemState.sortDir = th.dataset.type === 'num' ? 'desc' : 'asc';
+      }
+      itemState.page = 0;
+      renderItemTable();
+    });
+  });
+
+  // Event listeners — cascading: each filter change rebuilds downstream dropdowns
+  document.getElementById('item-date-from').addEventListener('change', () => { itemState.page = 0; rebuildCascade(); });
+  document.getElementById('item-date-to').addEventListener('change',   () => { itemState.page = 0; rebuildCascade(); });
+  document.getElementById('item-filter-week').addEventListener('change', () => { itemState.page = 0; rebuildCascade(); });
+  document.getElementById('item-filter-city').addEventListener('change', () => { itemState.page = 0; rebuildCascade('city'); });
+  document.getElementById('item-filter-spoc').addEventListener('change', () => { itemState.page = 0; rebuildCascade('spoc'); });
+  document.getElementById('item-filter-bucket').addEventListener('change', () => { itemState.page = 0; rebuildCascade('bucket'); });
+  document.getElementById('item-filter-item').addEventListener('change',   () => { itemState.page = 0; applyItemFilters(); });
+  document.getElementById('item-search').addEventListener('input', () => { itemState.page = 0; applyItemFilters(); });
+
+  document.getElementById('item-reset-btn').addEventListener('click', () => {
+    document.getElementById('item-search').value = '';
+    document.getElementById('item-date-from').value = dates[0] || '';
+    document.getElementById('item-date-to').value   = dates[dates.length-1] || '';
+    ['item-filter-week','item-filter-city','item-filter-spoc','item-filter-bucket','item-filter-item']
+      .forEach(id => document.getElementById(id).value = '');
+    itemState.page = 0;
+    rebuildCascade();
+  });
+
+  document.getElementById('item-download-btn').addEventListener('click', downloadItemCSV);
+
+  rebuildCascade();
+}
+
+// Get rows passing date+week filters only (used to seed cascading options)
+function getDateWeekFiltered() {
+  const from  = document.getElementById('item-date-from').value;
+  const to    = document.getElementById('item-date-to').value;
+  const wVal  = document.getElementById('item-filter-week').value;
+  return dailyRows.filter(r => {
+    if (from && r.DT < from) return false;
+    if (to   && r.DT > to)   return false;
+    if (wVal && r.WEEK !== wVal) return false;
+    return true;
+  });
+}
+
+function rebuildCascade(changedAt) {
+  const base = getDateWeekFiltered();
+
+  const cVal = document.getElementById('item-filter-city').value;
+  const sVal = document.getElementById('item-filter-spoc').value;
+  const bVal = document.getElementById('item-filter-bucket').value;
+
+  // City options = all unique cities in date+week scope
+  if (!changedAt || changedAt === 'reset') {
+    rebuildSelect('item-filter-city', [...new Set(base.map(r => r.CITY))].sort(), cVal);
+  }
+
+  // SPOC options = cities already selected
+  const afterCity = cVal ? base.filter(r => r.CITY === cVal) : base;
+  rebuildSelect('item-filter-spoc', [...new Set(afterCity.map(r => r.SPOC))].sort(), sVal);
+
+  // Bucket options = city+spoc already selected
+  const afterSpoc = sVal ? afterCity.filter(r => r.SPOC === sVal) : afterCity;
+  rebuildSelect('item-filter-bucket', [...new Set(afterSpoc.map(r => r['Basic Reason for IGCC']))].sort(), bVal);
+
+  // Item options = city+spoc+bucket already selected
+  const afterBucket = bVal ? afterSpoc.filter(r => r['Basic Reason for IGCC'] === bVal) : afterSpoc;
+  const iVal = document.getElementById('item-filter-item').value;
+  const itemNames = [...new Map(afterBucket.map(r => [r.ITEM_CODE_NEW, r.ITEM_NAME])).entries()]
+    .sort((a,b) => a[1].localeCompare(b[1]));
+  const iSel = document.getElementById('item-filter-item');
+  const prevI = iSel.value;
+  iSel.innerHTML = '<option value="">All Items</option>';
+  itemNames.forEach(([code, name]) => {
+    const o = document.createElement('option');
+    o.value = code; o.textContent = name;
+    iSel.appendChild(o);
+  });
+  if ([...iSel.options].some(o => o.value === prevI)) iSel.value = prevI;
+
+  applyItemFilters();
+}
+
+function rebuildSelect(id, values, keepVal) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="">All ${id.includes('city')?'Cities':id.includes('spoc')?'SPOCs':id.includes('bucket')?'Buckets':'Items'}</option>`;
+  values.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+  if (keepVal && [...sel.options].some(o => o.value === keepVal)) sel.value = keepVal;
+}
+
+function applyItemFilters() {
+  const from  = document.getElementById('item-date-from').value;
+  const to    = document.getElementById('item-date-to').value;
+  const wVal  = document.getElementById('item-filter-week').value;
+  const cVal  = document.getElementById('item-filter-city').value;
+  const sVal  = document.getElementById('item-filter-spoc').value;
+  const bVal  = document.getElementById('item-filter-bucket').value;
+  const iVal  = document.getElementById('item-filter-item').value;
+  const q     = document.getElementById('item-search').value.toLowerCase().trim();
+
+  // First filter daily rows by date + all dropdowns
+  const filtered = dailyRows.filter(r => {
+    if (from && r.DT < from) return false;
+    if (to   && r.DT > to)   return false;
+    if (wVal && r.WEEK !== wVal) return false;
+    if (cVal && r.CITY !== cVal) return false;
+    if (sVal && r.SPOC !== sVal) return false;
+    if (bVal && r['Basic Reason for IGCC'] !== bVal) return false;
+    if (iVal && r.ITEM_CODE_NEW !== iVal) return false;
+    if (q) {
+      const hay = `${r.ITEM_NAME} ${r.CITY} ${r.SPOC} ${r['Basic Reason for IGCC']} ${r.ITEM_CODE_NEW}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Aggregate to WEEK × CITY × ITEM_CODE × SPOC × Bucket — one row per combination
+  const cube = {};
+  filtered.forEach(r => {
+    const key = `${r.WEEK}|${r.CITY}|${r.ITEM_CODE_NEW}|${r.SPOC}|${r['Basic Reason for IGCC']}`;
+    if (!cube[key]) {
+      cube[key] = {
+        WEEK: r.WEEK, CITY: r.CITY,
+        ITEM_CODE_NEW: r.ITEM_CODE_NEW, ITEM_NAME: r.ITEM_NAME,
+        SPOC: r.SPOC, 'Basic Reason for IGCC': r['Basic Reason for IGCC'],
+        IGCC: 0, ORDERS: 0
+      };
+    }
+    cube[key].IGCC   += r.IGCC;
+    cube[key].ORDERS += r.ORDERS;
+  });
+
+  itemState.filtered = Object.values(cube).map(r => ({
+    ...r,
+    'inc_%': r.ORDERS > 0 ? (r.IGCC / r.ORDERS * 100).toFixed(2) + '%' : '0%'
+  }));
+
+  // Keep dailyRows reference for SPOC summary (needs raw rows for order dedup)
+  itemState.filteredDaily = filtered;
+
+  renderItemKPIs();
+  renderSpocSummary();
+  renderItemTable();
+}
+
+function renderItemKPIs() {
+  const rows = itemState.filtered;
+  const totalIGCC   = rows.reduce((s,r) => s + r.IGCC, 0);
+  const totalOrders = rows.reduce((s,r) => s + r.ORDERS, 0);
+  const rate = totalOrders > 0 ? (totalIGCC / totalOrders * 100).toFixed(3) + '%' : '—';
+  const itemIGCC = {}, itemName = {};
+  rows.forEach(r => {
+    itemIGCC[r.ITEM_CODE_NEW] = (itemIGCC[r.ITEM_CODE_NEW] || 0) + r.IGCC;
+    itemName[r.ITEM_CODE_NEW] = r.ITEM_NAME;
+  });
+  const topEntry = Object.entries(itemIGCC).sort((a,b) => b[1]-a[1])[0];
+
+  document.getElementById('item-kpi-rows').textContent    = rows.length.toLocaleString('en-IN');
+  document.getElementById('item-kpi-igcc').textContent    = totalIGCC.toLocaleString('en-IN');
+  document.getElementById('item-kpi-igcc-sub').textContent = `${[...new Set(rows.map(r=>r['Basic Reason for IGCC']))].length} buckets`;
+  document.getElementById('item-kpi-orders').textContent  = totalOrders.toLocaleString('en-IN');
+  document.getElementById('item-kpi-rate').textContent    = rate;
+  if (topEntry) {
+    document.getElementById('item-kpi-top').textContent     = itemName[topEntry[0]] || topEntry[0];
+    document.getElementById('item-kpi-top-sub').textContent = `${topEntry[1].toLocaleString('en-IN')} IGCC`;
+  } else {
+    document.getElementById('item-kpi-top').textContent = '—';
+    document.getElementById('item-kpi-top-sub').textContent = '';
+  }
+}
+
+function renderSpocSummary() {
+  // Use aggregated rows for IGCC totals; raw daily rows for deduped order counts
+  const rows      = itemState.filtered;
+  const dailyRows = itemState.filteredDaily || [];
+  const spocIGCC = {}, spocOrders = {};
+  rows.forEach(r => { spocIGCC[r.SPOC] = (spocIGCC[r.SPOC] || 0) + r.IGCC; });
+  // orders: deduplicate by DT+CITY+SPOC from raw daily rows
+  const seenDCS = {};
+  dailyRows.forEach(r => {
+    const k = `${r.DT}|${r.CITY}|${r.SPOC}`;
+    if (!seenDCS[k]) { seenDCS[k] = 1; spocOrders[r.SPOC] = (spocOrders[r.SPOC] || 0) + r.ORDERS; }
+  });
+  const totalIGCC = Object.values(spocIGCC).reduce((s,v) => s+v, 0);
+  const spocs = SPOC_ORDER.filter(s => spocIGCC[s] > 0);
+
+  const bar = document.getElementById('spoc-summary-bar');
+  bar.innerHTML = spocs.map(spoc => {
+    const igcc   = spocIGCC[spoc] || 0;
+    const orders = spocOrders[spoc] || 0;
+    const pctOfTotal = totalIGCC > 0 ? (igcc / totalIGCC * 100) : 0;
+    const rate       = orders > 0   ? (igcc / orders * 100) : 0;
+    const color = SPOC_COLORS[spoc] || '#888';
+    return `<div class="spoc-summary-card" style="border-left-color:${color};">
+      <div class="ss-label" style="color:${color};">${spoc}</div>
+      <div class="ss-pct">${rate.toFixed(2)}%</div>
+      <div class="ss-sub">IGCC/Orders &nbsp;|&nbsp; ${igcc.toLocaleString('en-IN')} IGCC &nbsp;·&nbsp; ${pctOfTotal.toFixed(1)}% of total</div>
+      <div class="ss-bar"><div class="ss-fill" style="width:${Math.min(100,pctOfTotal)}%;background:${color};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderItemTable() {
+  const col   = itemState.sortCol;
+  const dir   = itemState.sortDir;
+  const isNum = document.querySelector(`#item-table thead th[data-col="${col}"]`)?.dataset.type === 'num';
+
+  const sorted = [...itemState.filtered].sort((a, b) => {
+    const av = isNum ? (parseFloat(a[col]) || 0) : String(a[col] || '').toLowerCase();
+    const bv = isNum ? (parseFloat(b[col]) || 0) : String(b[col] || '').toLowerCase();
+    if (av < bv) return dir === 'asc' ? -1 : 1;
+    if (av > bv) return dir === 'asc' ?  1 : -1;
+    return b.IGCC - a.IGCC;
+  });
+
+  const total = sorted.length;
+  const pages = Math.max(1, Math.ceil(total / ITEM_PAGE_SIZE));
+  itemState.page = Math.min(itemState.page, pages - 1);
+  const start = itemState.page * ITEM_PAGE_SIZE;
+  const slice = sorted.slice(start, start + ITEM_PAGE_SIZE);
+
+  document.querySelectorAll('#item-table thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === col);
+    const icon = th.querySelector('.sort-icon');
+    icon.textContent = th.dataset.col === col ? (dir === 'asc' ? '↑' : '↓') : '↕';
+  });
+
+  const tbody = document.getElementById('item-tbody');
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => {
+      const bColor   = BUCKET_COLORS[r['Basic Reason for IGCC']] || '#888';
+      const sColor   = SPOC_COLORS[r.SPOC] || '#888';
+      const incNum   = parseFloat(r['inc_%']) || 0;
+      const incColor = incNum > 5 ? '#f87171' : incNum > 2 ? '#fbbf24' : '#94a3b8';
+      return `<tr>
+        <td class="num">W${r.WEEK}</td>
+        <td>${r.CITY}</td>
+        <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
+        <td style="font-weight:500;">${r.ITEM_NAME}</td>
+        <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${bColor};margin-right:5px;vertical-align:middle;"></span>${r['Basic Reason for IGCC']}</td>
+        <td style="color:${sColor};font-weight:600;">${r.SPOC}</td>
+        <td class="num" style="color:${r.IGCC>50?'#f87171':r.IGCC>20?'#fbbf24':'var(--text)'};font-weight:600;">${r.IGCC.toLocaleString('en-IN')}</td>
+        <td class="num">${r.ORDERS.toLocaleString('en-IN')}</td>
+        <td class="num" style="color:${incColor};">${r['inc_%']}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('item-count-label').textContent = `${total.toLocaleString('en-IN')} rows`;
+  document.getElementById('item-page-info').textContent   = total ? `Showing ${(start+1).toLocaleString('en-IN')}–${Math.min(start+ITEM_PAGE_SIZE,total).toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}` : 'No results';
+
+  const pag = document.getElementById('item-pagination');
+  pag.innerHTML = '';
+  const maxBtns = 7;
+  let pStart = Math.max(0, itemState.page - Math.floor(maxBtns/2));
+  let pEnd   = Math.min(pages-1, pStart + maxBtns - 1);
+  if (pEnd - pStart < maxBtns - 1) pStart = Math.max(0, pEnd - maxBtns + 1);
+  if (itemState.page > 0) { const b=document.createElement('button'); b.className='page-btn'; b.textContent='←'; b.onclick=()=>{itemState.page--;renderItemTable();}; pag.appendChild(b); }
+  for (let i = pStart; i <= pEnd; i++) {
+    const b = document.createElement('button');
+    b.className = 'page-btn'+(i===itemState.page?' active':'');
+    b.textContent = i+1;
+    b.onclick = ((pi)=>()=>{itemState.page=pi;renderItemTable();})(i);
+    pag.appendChild(b);
+  }
+  if (itemState.page < pages-1) { const b=document.createElement('button'); b.className='page-btn'; b.textContent='→'; b.onclick=()=>{itemState.page++;renderItemTable();}; pag.appendChild(b); }
+}
+
+function downloadItemCSV() {
+  const cols = ['WEEK','CITY','ITEM_CODE_NEW','ITEM_NAME','Basic Reason for IGCC','SPOC','IGCC','ORDERS','inc_%'];
+  const lines = [cols.join(',')];
+  itemState.filtered.forEach(r => {
+    lines.push(cols.map(c => {
+      const v = String(r[c] ?? '');
+      return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+    }).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_item_details.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
