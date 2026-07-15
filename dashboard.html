@@ -487,29 +487,33 @@
       </div>
 
       <!-- Weekly Summary Filters bar -->
-      <div class="item-filters-bar" id="ws-filters-bar">
-        <div class="item-filter-row">
-          <div class="item-filter-group">
-            <label>Week</label>
-            <select class="item-sel" id="ws-filter-week"><option value="">All Weeks</option></select>
-          </div>
-          <div class="item-filter-group">
-            <label>City</label>
-            <select class="item-sel" id="ws-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
-          </div>
-          <div class="item-filter-group" style="flex:1;">
-            <label>RCA Bucket</label>
-            <select class="item-sel" id="ws-filter-bucket" style="min-width:200px;width:100%;"><option value="">All Buckets</option></select>
-          </div>
-          <div class="item-filter-group" style="flex:2;">
-            <label>Search Item</label>
-            <input class="item-search" id="ws-search" type="text" placeholder="Item name or code...">
-          </div>
-          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
-            <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
-            <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
-            <span class="item-count" id="ws-count-label" style="line-height:34px;"></span>
-          </div>
+      <div class="filters-bar" id="ws-filters-bar" style="margin-bottom:12px;">
+        <div class="filter-group">
+          <label>Week</label>
+          <select id="ws-filter-week" multiple placeholder="All Weeks"></select>
+        </div>
+        <div class="filter-group wide">
+          <label style="display:flex;align-items:center;gap:6px;">
+            City
+            <button class="tier-btn" id="ws-tier1-btn" onclick="wsSelectTier(1)" title="Tier 1 cities">T1</button>
+            <button class="tier-btn" id="ws-tier2-btn" onclick="wsSelectTier(2)" title="Tier 2 cities">T2</button>
+            <button class="tier-btn tier-clear-btn" onclick="wsSelectTier(0)" title="Clear">✕</button>
+          </label>
+          <select id="ws-filter-city" multiple placeholder="All Cities"></select>
+        </div>
+        <div class="filter-group">
+          <label>SPOC</label>
+          <select id="ws-filter-spoc" multiple placeholder="All SPOCs"></select>
+        </div>
+        <div class="filter-group wide">
+          <label>RCA Bucket</label>
+          <select id="ws-filter-bucket" multiple placeholder="All Buckets"></select>
+        </div>
+        <div class="filter-group" style="justify-content:flex-end;align-self:flex-end;flex-direction:row;gap:6px;padding-bottom:2px;">
+          <input class="item-search" id="ws-search" type="text" placeholder="Search item..." style="height:34px;padding:0 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;min-width:160px;">
+          <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
+          <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
+          <span class="item-count" id="ws-count-label" style="line-height:34px;font-size:12px;color:var(--muted);white-space:nowrap;"></span>
         </div>
       </div>
 
@@ -2135,64 +2139,139 @@ document.getElementById('ws-reload-btn').addEventListener('click', () => {
   loadWeeklySummary();
 });
 
+// Tom Select instances for weekly summary tab
+let wsTsWeek, wsTsCity, wsTsSpoc, wsTsBucket;
+
+function wsSelectTier(tier) {
+  if (!wsTsCity) return;
+  document.getElementById('ws-tier1-btn').classList.toggle('active', tier === 1);
+  document.getElementById('ws-tier2-btn').classList.toggle('active', tier === 2);
+  if (tier === 0) {
+    wsTsCity.clear(true);
+  } else {
+    const available = Object.keys(wsTsCity.options || {});
+    wsTsCity.clear(true);
+    available.forEach(city => {
+      const inT1 = TIER1_CITIES.has(city);
+      const inT2 = TIER2_CITIES.size ? TIER2_CITIES.has(city) : !inT1;
+      if ((tier === 1 && inT1) || (tier === 2 && inT2)) wsTsCity.addItem(city, true);
+    });
+  }
+  wsState.page = 0;
+  applyWsFilters();
+}
+
 function initWsSummaryTab() {
-  // Populate week dropdown
-  const allWeeks = [...new Set(wsRawRows.map(r => r.WEEK))].sort((a, b) => +a - +b);
-  const wSel = document.getElementById('ws-filter-week');
-  wSel.innerHTML = '<option value="">All Weeks</option>';
-  allWeeks.forEach(w => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
-
-  // Populate city dropdown
-  const allCities = [...new Set(wsRawRows.map(r => r.CITY))].sort();
-  const cSel = document.getElementById('ws-filter-city');
-  cSel.innerHTML = '<option value="">All Cities</option>';
-  allCities.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
-
-  // Populate bucket dropdown (from parsed buckets)
+  const allWeeks   = [...new Set(wsRawRows.map(r => r.WEEK))].sort((a,b) => +a - +b);
+  const allCities  = [...new Set(wsRawRows.map(r => r.CITY))].sort();
   const allBuckets = [...new Set(wsRawRows.flatMap(r => r._buckets.map(b => b.bucket)))].sort();
-  const bSel = document.getElementById('ws-filter-bucket');
-  bSel.innerHTML = '<option value="">All Buckets</option>';
-  allBuckets.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; bSel.appendChild(o); });
+  // SPOCs from aggregatedCube (joined by week+city)
+  const allSpocs   = SPOC_ORDER.length ? SPOC_ORDER : [...new Set(aggregatedCube.map(r => r.spoc))].sort();
+
+  // Build week+city → spoc set for SPOC filter join
+  const wcSpocs = {};
+  aggregatedCube.forEach(r => {
+    const k = `${r.week}|${r.city}`;
+    if (!wcSpocs[k]) wcSpocs[k] = new Set();
+    wcSpocs[k].add(r.spoc);
+  });
+
+  // Destroy existing Tom Select instances if reinitialising
+  if (wsTsWeek)   { wsTsWeek.destroy();   wsTsWeek   = null; }
+  if (wsTsCity)   { wsTsCity.destroy();   wsTsCity   = null; }
+  if (wsTsSpoc)   { wsTsSpoc.destroy();   wsTsSpoc   = null; }
+  if (wsTsBucket) { wsTsBucket.destroy(); wsTsBucket = null; }
+
+  wsTsWeek = new TomSelect('#ws-filter-week', {
+    plugins: ['remove_button'],
+    options: allWeeks.map(w => ({ value: w, text: `Week ${w}` })),
+    maxItems: null,
+    onChange: () => { wsState.page = 0; applyWsFilters(); }
+  });
+
+  wsTsCity = new TomSelect('#ws-filter-city', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allCities.map(c => ({ value: c, text: c })),
+    maxItems: null,
+    onChange: () => {
+      document.getElementById('ws-tier1-btn').classList.remove('active');
+      document.getElementById('ws-tier2-btn').classList.remove('active');
+      wsState.page = 0;
+      applyWsFilters();
+    }
+  });
+
+  wsTsSpoc = new TomSelect('#ws-filter-spoc', {
+    plugins: ['remove_button'],
+    options: allSpocs.map(s => ({ value: s, text: s, color: SPOC_COLORS[s] || '#888' })),
+    maxItems: null,
+    render: {
+      option: d => `<div class="option"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.color};margin-right:6px;vertical-align:middle;"></span>${d.text}</div>`,
+      item:   d => `<div class="item"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.color};margin-right:5px;vertical-align:middle;"></span>${d.text}</div>`
+    },
+    onChange: () => { wsState.page = 0; applyWsFilters(); }
+  });
+
+  wsTsBucket = new TomSelect('#ws-filter-bucket', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allBuckets.map(b => ({ value: b, text: b, color: BUCKET_COLORS[b] || '#888' })),
+    maxItems: null,
+    render: {
+      option: d => `<div class="option"><span class="bucket-dot" style="background:${d.color};"></span>${d.text}</div>`,
+      item:   d => `<div class="item"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.color};margin-right:5px;vertical-align:middle;"></span>${d.text}</div>`
+    },
+    onChange: () => { wsState.page = 0; applyWsFilters(); }
+  });
+
+  // Store wcSpocs on state for use in applyWsFilters
+  wsState.wcSpocs = wcSpocs;
 
   // Sort headers
   document.querySelectorAll('#ws-table thead th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
-      if (wsState.sortCol === th.dataset.col) {
-        wsState.sortDir = wsState.sortDir === 'asc' ? 'desc' : 'asc';
-      } else {
-        wsState.sortCol = th.dataset.col;
-        wsState.sortDir = th.dataset.type === 'num' ? 'desc' : 'asc';
-      }
+      wsState.sortCol = th.dataset.col;
+      wsState.sortDir = wsState.sortCol === th.dataset.col && wsState.sortDir === 'asc' ? 'desc' : (th.dataset.type === 'num' ? 'desc' : 'asc');
       wsState.page = 0;
       renderWsTable();
     });
   });
 
-  ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => { wsState.page = 0; applyWsFilters(); });
-  });
   document.getElementById('ws-search').addEventListener('input', () => { wsState.page = 0; applyWsFilters(); });
+
   document.getElementById('ws-reset-btn').addEventListener('click', () => {
-    ['ws-filter-week', 'ws-filter-city', 'ws-filter-bucket'].forEach(id => document.getElementById(id).value = '');
+    wsTsWeek.clear(true);
+    wsTsCity.clear(true);
+    wsTsSpoc.clear(true);
+    wsTsBucket.clear(true);
+    document.getElementById('ws-tier1-btn').classList.remove('active');
+    document.getElementById('ws-tier2-btn').classList.remove('active');
     document.getElementById('ws-search').value = '';
     wsState.page = 0;
     applyWsFilters();
   });
+
   document.getElementById('ws-download-btn').addEventListener('click', downloadWsCSV);
 
   applyWsFilters();
 }
 
 function applyWsFilters() {
-  const wVal = document.getElementById('ws-filter-week').value;
-  const cVal = document.getElementById('ws-filter-city').value;
-  const bVal = document.getElementById('ws-filter-bucket').value;
-  const q    = document.getElementById('ws-search').value.toLowerCase().trim();
+  const wVals = wsTsWeek   ? wsTsWeek.getValue()   : [];
+  const cVals = wsTsCity   ? wsTsCity.getValue()   : [];
+  const sVals = wsTsSpoc   ? wsTsSpoc.getValue()   : [];
+  const bVals = wsTsBucket ? wsTsBucket.getValue() : [];
+  const q     = (document.getElementById('ws-search')?.value || '').toLowerCase().trim();
+  const wcSpocs = wsState.wcSpocs || {};
 
   wsState.filtered = wsRawRows.filter(r => {
-    if (wVal && r.WEEK !== wVal) return false;
-    if (cVal && r.CITY !== cVal) return false;
-    if (bVal && !r._buckets.some(b => b.bucket === bVal)) return false;
+    if (wVals.length && !wVals.includes(r.WEEK)) return false;
+    if (cVals.length && !cVals.includes(r.CITY)) return false;
+    if (sVals.length) {
+      // keep row only if the city+week has IGCC from at least one selected SPOC
+      const spocSet = wcSpocs[`${r.WEEK}|${r.CITY}`] || new Set();
+      if (!sVals.some(s => spocSet.has(s))) return false;
+    }
+    if (bVals.length && !bVals.some(bv => r._buckets.some(b => b.bucket === bv))) return false;
     if (q) {
       const hay = `${r.ITEM_NAME} ${r.ITEM_CODE_NEW} ${r.CITY}`.toLowerCase();
       if (!hay.includes(q)) return false;
