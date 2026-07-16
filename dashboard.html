@@ -596,19 +596,11 @@
             <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
           </div>
         </div>
-        <!-- Row 2: City + SPOC + Bucket (dynamic / cascading) -->
+        <!-- Row 2: City + Item (dynamic) -->
         <div class="item-filter-row">
           <div class="item-filter-group">
             <label>City</label>
             <select class="item-sel" id="item-filter-city" style="min-width:160px;"><option value="">All Cities</option></select>
-          </div>
-          <div class="item-filter-group">
-            <label>SPOC</label>
-            <select class="item-sel" id="item-filter-spoc"><option value="">All SPOCs</option></select>
-          </div>
-          <div class="item-filter-group" style="flex:1;">
-            <label>RCA Bucket</label>
-            <select class="item-sel" id="item-filter-bucket" style="min-width:220px;width:100%;"><option value="">All Buckets</option></select>
           </div>
           <div class="item-filter-group">
             <label>Item Name</label>
@@ -654,11 +646,9 @@
                 <th data-col="CITY"  data-type="str">City <span class="sort-icon">↕</span></th>
                 <th data-col="ITEM_CODE_NEW" data-type="str">Code <span class="sort-icon">↕</span></th>
                 <th data-col="ITEM_NAME"     data-type="str">Item Name <span class="sort-icon">↕</span></th>
-                <th data-col="Basic Reason for IGCC" data-type="str">RCA Bucket <span class="sort-icon">↕</span></th>
-                <th data-col="SPOC"  data-type="str">SPOC <span class="sort-icon">↕</span></th>
-                <th data-col="IGCC"  data-type="num">IGCC <span class="sort-icon">↕</span></th>
+                <th data-col="IGCC"  data-type="num">Total IGCC <span class="sort-icon">↕</span></th>
                 <th data-col="ORDERS" data-type="num">Orders <span class="sort-icon">↕</span></th>
-                <th data-col="inc_%" data-type="num">Inc % <span class="sort-icon">↕</span></th>
+                <th style="min-width:340px;">RCA Bucket Breakdown</th>
               </tr>
             </thead>
             <tbody id="item-tbody"></tbody>
@@ -2066,11 +2056,9 @@ document.querySelectorAll('.item-subtab-btn').forEach(btn => {
 // ─────────────────────────────────────────────
 // WEEKLY SUMMARY — loads from Google Sheet CSV export
 // ─────────────────────────────────────────────
-const WS_SHEET_ID = '1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk';
-const WS_GID      = '0'; // WeeklyRCA-Summary tab (first tab)
-const WS_CSV_URL  = `https://docs.google.com/spreadsheets/d/${WS_SHEET_ID}/export?format=csv&gid=${WS_GID}`;
+const WS_CSV_URL  = 'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv';
 
-let wsRawRows  = [];  // parsed rows from Google Sheet
+let wsRawRows  = [];  // parsed rows from weekly CSV
 let wsState    = { inited: false, sortCol: 'Total IGCC', sortDir: 'desc', page: 0, filtered: [] };
 const WS_PAGE_SIZE = 100;
 
@@ -2120,7 +2108,7 @@ async function loadWeeklySummary() {
 
     document.getElementById('ws-error-panel').style.display  = 'none';
     document.getElementById('ws-source-bar').style.display   = 'flex';
-    document.getElementById('ws-source-text').textContent    = `Loaded ${wsRawRows.length.toLocaleString('en-IN')} rows from Google Sheet`;
+    document.getElementById('ws-source-text').textContent    = `Loaded ${wsRawRows.length.toLocaleString('en-IN')} rows from weekly CSV`;
     initWsSummaryTab();
 
   } catch (err) {
@@ -2394,23 +2382,22 @@ let dailyRows = [];   // raw rows from Item_level_daily.csv
 async function loadDailyData() {
   itemState.inited = true;
   document.getElementById('item-tbody').innerHTML =
-    `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);">Loading daily data…</td></tr>`;
+    `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">Loading daily data…</td></tr>`;
 
   await new Promise((resolve, reject) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_daily.csv', {
+    Papa.parse('Weekly RCA bucket sumarry - Daily-RCA-Summary.csv', {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         dailyRows = data.map(row => ({
-          DT:   String(row.DT || '').trim(),
+          DT:   String(row.DATE || row.DT || '').trim(),
           WEEK: String(row.WEEK || row['﻿WEEK'] || '').trim(),
           CITY: String(row.CITY || '').trim(),
           ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
           ITEM_NAME:     String(row.ITEM_NAME || '').trim(),
-          'Basic Reason for IGCC': String(row['Basic Reason for IGCC'] || '').trim() || '<NA>',
-          SPOC:   String(row.SPOC || '').trim() || '<NA>',
-          IGCC:   parseInt(row.IGCC, 10) || 0,
-          ORDERS: parseInt(row.ORDERS, 10) || 0,
-          'inc_%': String(row['inc_%'] || '').trim()
+          IGCC:   parseInt(row['Total IGCC'] || row.IGCC, 10) || 0,
+          ORDERS: parseInt(row['Unique Order Numbers'] || row.ORDERS, 10) || 0,
+          'Reason Summary': String(row['Reason Summary'] || '').trim(),
+          _buckets: parseReasonSummary(String(row['Reason Summary'] || '').trim())
         })).filter(r => r.DT && r.CITY);
         resolve();
       },
@@ -2422,20 +2409,17 @@ async function loadDailyData() {
 }
 
 function initItemTab() {
-  // Set date range defaults from data
   const dates = dailyRows.map(r => r.DT).filter(Boolean).sort();
   if (dates.length) {
     document.getElementById('item-date-from').value = dates[0];
     document.getElementById('item-date-to').value   = dates[dates.length - 1];
   }
 
-  // Populate week dropdown (static)
   const allWeeks = [...new Set(dailyRows.map(r => r.WEEK))].sort((a,b) => +a - +b);
   const wSel = document.getElementById('item-filter-week');
   wSel.innerHTML = '<option value="">All Weeks</option>';
   allWeeks.forEach(w => { const o = document.createElement('option'); o.value = w; o.textContent = `Week ${w}`; wSel.appendChild(o); });
 
-  // Sort header clicks
   document.querySelectorAll('#item-table thead th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
       if (itemState.sortCol === th.dataset.col) {
@@ -2449,21 +2433,18 @@ function initItemTab() {
     });
   });
 
-  // Event listeners — cascading: each filter change rebuilds downstream dropdowns
   document.getElementById('item-date-from').addEventListener('change', () => { itemState.page = 0; rebuildCascade(); });
   document.getElementById('item-date-to').addEventListener('change',   () => { itemState.page = 0; rebuildCascade(); });
   document.getElementById('item-filter-week').addEventListener('change', () => { itemState.page = 0; rebuildCascade(); });
   document.getElementById('item-filter-city').addEventListener('change', () => { itemState.page = 0; rebuildCascade('city'); });
-  document.getElementById('item-filter-spoc').addEventListener('change', () => { itemState.page = 0; rebuildCascade('spoc'); });
-  document.getElementById('item-filter-bucket').addEventListener('change', () => { itemState.page = 0; rebuildCascade('bucket'); });
-  document.getElementById('item-filter-item').addEventListener('change',   () => { itemState.page = 0; applyItemFilters(); });
+  document.getElementById('item-filter-item').addEventListener('change', () => { itemState.page = 0; applyItemFilters(); });
   document.getElementById('item-search').addEventListener('input', () => { itemState.page = 0; applyItemFilters(); });
 
   document.getElementById('item-reset-btn').addEventListener('click', () => {
     document.getElementById('item-search').value = '';
     document.getElementById('item-date-from').value = dates[0] || '';
     document.getElementById('item-date-to').value   = dates[dates.length-1] || '';
-    ['item-filter-week','item-filter-city','item-filter-spoc','item-filter-bucket','item-filter-item']
+    ['item-filter-week','item-filter-city','item-filter-item']
       .forEach(id => document.getElementById(id).value = '');
     itemState.page = 0;
     rebuildCascade();
@@ -2474,7 +2455,6 @@ function initItemTab() {
   rebuildCascade();
 }
 
-// Get rows passing date+week filters only (used to seed cascading options)
 function getDateWeekFiltered() {
   const from  = document.getElementById('item-date-from').value;
   const to    = document.getElementById('item-date-to').value;
@@ -2489,28 +2469,15 @@ function getDateWeekFiltered() {
 
 function rebuildCascade(changedAt) {
   const base = getDateWeekFiltered();
-
   const cVal = document.getElementById('item-filter-city').value;
-  const sVal = document.getElementById('item-filter-spoc').value;
-  const bVal = document.getElementById('item-filter-bucket').value;
 
-  // City options = all unique cities in date+week scope
   if (!changedAt || changedAt === 'reset') {
     rebuildSelect('item-filter-city', [...new Set(base.map(r => r.CITY))].sort(), cVal);
   }
 
-  // SPOC options = cities already selected
   const afterCity = cVal ? base.filter(r => r.CITY === cVal) : base;
-  rebuildSelect('item-filter-spoc', [...new Set(afterCity.map(r => r.SPOC))].sort(), sVal);
-
-  // Bucket options = city+spoc already selected
-  const afterSpoc = sVal ? afterCity.filter(r => r.SPOC === sVal) : afterCity;
-  rebuildSelect('item-filter-bucket', [...new Set(afterSpoc.map(r => r['Basic Reason for IGCC']))].sort(), bVal);
-
-  // Item options = city+spoc+bucket already selected
-  const afterBucket = bVal ? afterSpoc.filter(r => r['Basic Reason for IGCC'] === bVal) : afterSpoc;
   const iVal = document.getElementById('item-filter-item').value;
-  const itemNames = [...new Map(afterBucket.map(r => [r.ITEM_CODE_NEW, r.ITEM_NAME])).entries()]
+  const itemNames = [...new Map(afterCity.map(r => [r.ITEM_CODE_NEW, r.ITEM_NAME])).entries()]
     .sort((a,b) => a[1].localeCompare(b[1]));
   const iSel = document.getElementById('item-filter-item');
   const prevI = iSel.value;
@@ -2541,50 +2508,21 @@ function applyItemFilters() {
   const to    = document.getElementById('item-date-to').value;
   const wVal  = document.getElementById('item-filter-week').value;
   const cVal  = document.getElementById('item-filter-city').value;
-  const sVal  = document.getElementById('item-filter-spoc').value;
-  const bVal  = document.getElementById('item-filter-bucket').value;
   const iVal  = document.getElementById('item-filter-item').value;
   const q     = document.getElementById('item-search').value.toLowerCase().trim();
 
-  // First filter daily rows by date + all dropdowns
-  const filtered = dailyRows.filter(r => {
+  itemState.filtered = dailyRows.filter(r => {
     if (from && r.DT < from) return false;
     if (to   && r.DT > to)   return false;
     if (wVal && r.WEEK !== wVal) return false;
     if (cVal && r.CITY !== cVal) return false;
-    if (sVal && r.SPOC !== sVal) return false;
-    if (bVal && r['Basic Reason for IGCC'] !== bVal) return false;
     if (iVal && r.ITEM_CODE_NEW !== iVal) return false;
     if (q) {
-      const hay = `${r.ITEM_NAME} ${r.CITY} ${r.SPOC} ${r['Basic Reason for IGCC']} ${r.ITEM_CODE_NEW}`.toLowerCase();
+      const hay = `${r.ITEM_NAME} ${r.CITY} ${r.ITEM_CODE_NEW} ${r['Reason Summary']}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
-
-  // Aggregate to WEEK × CITY × ITEM_CODE × SPOC × Bucket — one row per combination
-  const cube = {};
-  filtered.forEach(r => {
-    const key = `${r.WEEK}|${r.CITY}|${r.ITEM_CODE_NEW}|${r.SPOC}|${r['Basic Reason for IGCC']}`;
-    if (!cube[key]) {
-      cube[key] = {
-        WEEK: r.WEEK, CITY: r.CITY,
-        ITEM_CODE_NEW: r.ITEM_CODE_NEW, ITEM_NAME: r.ITEM_NAME,
-        SPOC: r.SPOC, 'Basic Reason for IGCC': r['Basic Reason for IGCC'],
-        IGCC: 0, ORDERS: 0
-      };
-    }
-    cube[key].IGCC   += r.IGCC;
-    cube[key].ORDERS += r.ORDERS;
-  });
-
-  itemState.filtered = Object.values(cube).map(r => ({
-    ...r,
-    'inc_%': r.ORDERS > 0 ? (r.IGCC / r.ORDERS * 100).toFixed(2) + '%' : '0%'
-  }));
-
-  // Keep dailyRows reference for SPOC summary (needs raw rows for order dedup)
-  itemState.filteredDaily = filtered;
 
   renderItemKPIs();
   renderSpocSummary();
@@ -2603,11 +2541,11 @@ function renderItemKPIs() {
   });
   const topEntry = Object.entries(itemIGCC).sort((a,b) => b[1]-a[1])[0];
 
-  document.getElementById('item-kpi-rows').textContent    = rows.length.toLocaleString('en-IN');
-  document.getElementById('item-kpi-igcc').textContent    = totalIGCC.toLocaleString('en-IN');
-  document.getElementById('item-kpi-igcc-sub').textContent = `${[...new Set(rows.map(r=>r['Basic Reason for IGCC']))].length} buckets`;
-  document.getElementById('item-kpi-orders').textContent  = totalOrders.toLocaleString('en-IN');
-  document.getElementById('item-kpi-rate').textContent    = rate;
+  document.getElementById('item-kpi-rows').textContent     = rows.length.toLocaleString('en-IN');
+  document.getElementById('item-kpi-igcc').textContent     = totalIGCC.toLocaleString('en-IN');
+  document.getElementById('item-kpi-igcc-sub').textContent = `across ${[...new Set(rows.map(r=>r.CITY))].length} cities`;
+  document.getElementById('item-kpi-orders').textContent   = totalOrders.toLocaleString('en-IN');
+  document.getElementById('item-kpi-rate').textContent     = rate;
   if (topEntry) {
     document.getElementById('item-kpi-top').textContent     = itemName[topEntry[0]] || topEntry[0];
     document.getElementById('item-kpi-top-sub').textContent = `${topEntry[1].toLocaleString('en-IN')} IGCC`;
@@ -2618,34 +2556,8 @@ function renderItemKPIs() {
 }
 
 function renderSpocSummary() {
-  // Use aggregated rows for IGCC totals; raw daily rows for deduped order counts
-  const rows      = itemState.filtered;
-  const dailyRows = itemState.filteredDaily || [];
-  const spocIGCC = {}, spocOrders = {};
-  rows.forEach(r => { spocIGCC[r.SPOC] = (spocIGCC[r.SPOC] || 0) + r.IGCC; });
-  // orders: deduplicate by DT+CITY+SPOC from raw daily rows
-  const seenDCS = {};
-  dailyRows.forEach(r => {
-    const k = `${r.DT}|${r.CITY}|${r.SPOC}`;
-    if (!seenDCS[k]) { seenDCS[k] = 1; spocOrders[r.SPOC] = (spocOrders[r.SPOC] || 0) + r.ORDERS; }
-  });
-  const totalIGCC = Object.values(spocIGCC).reduce((s,v) => s+v, 0);
-  const spocs = SPOC_ORDER.filter(s => spocIGCC[s] > 0);
-
-  const bar = document.getElementById('spoc-summary-bar');
-  bar.innerHTML = spocs.map(spoc => {
-    const igcc   = spocIGCC[spoc] || 0;
-    const orders = spocOrders[spoc] || 0;
-    const pctOfTotal = totalIGCC > 0 ? (igcc / totalIGCC * 100) : 0;
-    const rate       = orders > 0   ? (igcc / orders * 100) : 0;
-    const color = SPOC_COLORS[spoc] || '#888';
-    return `<div class="spoc-summary-card" style="border-left-color:${color};">
-      <div class="ss-label" style="color:${color};">${spoc}</div>
-      <div class="ss-pct">${rate.toFixed(2)}%</div>
-      <div class="ss-sub">IGCC/Orders &nbsp;|&nbsp; ${igcc.toLocaleString('en-IN')} IGCC &nbsp;·&nbsp; ${pctOfTotal.toFixed(1)}% of total</div>
-      <div class="ss-bar"><div class="ss-fill" style="width:${Math.min(100,pctOfTotal)}%;background:${color};"></div></div>
-    </div>`;
-  }).join('');
+  // No SPOC column in new daily CSV — hide the summary bar
+  document.getElementById('spoc-summary-bar').innerHTML = '';
 }
 
 function renderItemTable() {
@@ -2675,23 +2587,21 @@ function renderItemTable() {
 
   const tbody = document.getElementById('item-tbody');
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">No data found</td></tr>`;
   } else {
     tbody.innerHTML = slice.map(r => {
-      const bColor   = BUCKET_COLORS[r['Basic Reason for IGCC']] || '#888';
-      const sColor   = SPOC_COLORS[r.SPOC] || '#888';
-      const incNum   = parseFloat(r['inc_%']) || 0;
-      const incColor = incNum > 5 ? '#f87171' : incNum > 2 ? '#fbbf24' : '#94a3b8';
+      const pills = (r._buckets || []).map(b => {
+        const c = BUCKET_COLORS[b.bucket] || '#888';
+        return `<span class="bkt-pill" style="background:${c}22;color:${c};border:1px solid ${c}55;">${b.bucket} <b>${b.count}</b></span>`;
+      }).join('');
       return `<tr>
         <td class="num">W${r.WEEK}</td>
         <td>${r.CITY}</td>
         <td style="color:var(--muted);">${r.ITEM_CODE_NEW}</td>
         <td style="font-weight:500;">${r.ITEM_NAME}</td>
-        <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${bColor};margin-right:5px;vertical-align:middle;"></span>${r['Basic Reason for IGCC']}</td>
-        <td style="color:${sColor};font-weight:600;">${r.SPOC}</td>
         <td class="num" style="color:${r.IGCC>50?'#f87171':r.IGCC>20?'#fbbf24':'var(--text)'};font-weight:600;">${r.IGCC.toLocaleString('en-IN')}</td>
-        <td class="num">${r.ORDERS.toLocaleString('en-IN')}</td>
-        <td class="num" style="color:${incColor};">${r['inc_%']}</td>
+        <td class="num">${r.ORDERS ? r.ORDERS.toLocaleString('en-IN') : '—'}</td>
+        <td>${pills || '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
       </tr>`;
     }).join('');
   }
@@ -2717,7 +2627,7 @@ function renderItemTable() {
 }
 
 function downloadItemCSV() {
-  const cols = ['WEEK','CITY','ITEM_CODE_NEW','ITEM_NAME','Basic Reason for IGCC','SPOC','IGCC','ORDERS','inc_%'];
+  const cols = ['WEEK','CITY','ITEM_CODE_NEW','ITEM_NAME','IGCC','ORDERS','Reason Summary'];
   const lines = [cols.join(',')];
   itemState.filtered.forEach(r => {
     lines.push(cols.map(c => {
@@ -2726,7 +2636,7 @@ function downloadItemCSV() {
     }).join(','));
   });
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_item_details.csv'; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_daily_details.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
