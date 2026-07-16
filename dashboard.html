@@ -322,6 +322,9 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-outline" id="reset-btn">Reset Filters</button>
+      <button class="btn btn-outline" id="refresh-data-btn" title="Re-fetch all CSVs and reload dashboard data" style="display:flex;align-items:center;gap:6px;">
+        <span id="refresh-icon" style="font-size:15px;display:inline-block;transition:transform 0.6s;">&#8635;</span> Refresh Data
+      </button>
       <button class="btn btn-primary" id="download-btn">⬇ Download CSV</button>
     </div>
   </div>
@@ -1003,6 +1006,53 @@ function initApp() {
   initCharts();
   onFilterChange();
 }
+
+// ─────────────────────────────────────────────
+// REFRESH ALL DATA
+// ─────────────────────────────────────────────
+async function refreshAllData() {
+  const btn  = document.getElementById('refresh-data-btn');
+  const icon = document.getElementById('refresh-icon');
+  btn.disabled = true;
+  icon.style.animation = 'spin 0.7s linear infinite';
+
+  // Destroy trend-tab Tom Selects so initApp can recreate them
+  if (tsWeek)   { try { tsWeek.destroy();   } catch(e){} tsWeek   = null; }
+  if (tsCity)   { try { tsCity.destroy();   } catch(e){} tsCity   = null; }
+  if (tsSpoc)   { try { tsSpoc.destroy();   } catch(e){} tsSpoc   = null; }
+  if (tsBucket) { try { tsBucket.destroy(); } catch(e){} tsBucket = null; }
+
+  // Reset data arrays
+  aggregatedCube = [];
+  unicOrdersMap  = {};
+  rawItemRows    = [];
+
+  // Destroy weekly-summary Tom Selects and reset state
+  if (wsTsWeek)   { try { wsTsWeek.destroy();   } catch(e){} wsTsWeek   = null; }
+  if (wsTsCity)   { try { wsTsCity.destroy();   } catch(e){} wsTsCity   = null; }
+  if (wsTsSpoc)   { try { wsTsSpoc.destroy();   } catch(e){} wsTsSpoc   = null; }
+  if (wsTsBucket) { try { wsTsBucket.destroy(); } catch(e){} wsTsBucket = null; }
+  wsRawRows = [];
+  wsState   = { inited: false, sortCol: 'Total IGCC', sortDir: 'desc', page: 0, filtered: [] };
+
+  // Reset daily tab
+  dailyRows = [];
+  itemState = { sortCol: 'IGCC', sortDir: 'desc', page: 0, filtered: [], inited: false };
+
+  // Show loading overlay and reload
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('progress-bar-fill').style.width = '0%';
+
+  try {
+    await loadData();
+  } finally {
+    icon.style.animation = '';
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('refresh-data-btn').addEventListener('click', refreshAllData);
 
 // ─────────────────────────────────────────────
 // FILTER
