@@ -2389,7 +2389,7 @@ async function loadDailyData() {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         dailyRows = data.map(row => ({
-          DT:   String(row.DATE || row.DT || '').trim(),
+          DT:   (d => { const p = (String(row.DATE || row.DT || '').trim()).split('/'); return p.length===3 ? `${p[2]}-${p[0].padStart(2,'0')}-${p[1].padStart(2,'0')}` : String(row.DATE || row.DT || '').trim(); })(),
           WEEK: String(row.WEEK || row['﻿WEEK'] || '').trim(),
           CITY: String(row.CITY || '').trim(),
           ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
