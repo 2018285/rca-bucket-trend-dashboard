@@ -269,6 +269,10 @@
   .item-subtab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
   .item-subpane { display: none; }
   .item-subpane.active { display: block; }
+  /* Duration highlight badge */
+  .duration-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.13); color:#a5b4fc; border:1px solid rgba(99,102,241,0.35); border-radius:6px; font-size:11px; font-weight:700; padding:2px 8px; margin-left:8px; white-space:nowrap; vertical-align:middle; }
+  .duration-badge::before { content:'📅'; font-size:10px; }
+
   /* Bucket pills for weekly summary */
   .bkt-pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 600; margin: 1px; white-space: nowrap; }
   .ws-error-panel { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
@@ -350,6 +354,7 @@
       <div class="chart-title" style="margin-bottom:0;">
         PAN-India-Week × SPOC IGCC Trend
         <span class="badge" id="pivot-badge">—</span>
+        <span class="duration-badge" id="pivot-duration"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="table-info" id="pivot-info"></span>
@@ -366,6 +371,7 @@
       <div class="chart-title" style="margin-bottom:0;">
         City × SPOC Bucketing Summary
         <span class="badge" id="summary-badge">—</span>
+        <span class="duration-badge" id="summary-duration"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="table-info" id="summary-info"></span>
@@ -383,6 +389,7 @@
       <div class="chart-title" style="margin-bottom:0;">
         City × Week IGCC Rate Trend
         <span class="badge" id="city-week-badge">—</span>
+        <span class="duration-badge" id="cwt-duration"></span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click city to expand</span>
@@ -513,6 +520,7 @@
           <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
           <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
           <span class="item-count" id="ws-count-label" style="line-height:34px;font-size:12px;color:var(--muted);white-space:nowrap;"></span>
+          <span class="duration-badge" id="ws-duration"></span>
         </div>
       </div>
 
@@ -594,6 +602,7 @@
             <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
             <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
             <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
+          <span class="duration-badge" id="daily-duration"></span>
           </div>
         </div>
         <!-- Row 2: City + Item (dynamic) -->
@@ -1442,6 +1451,7 @@ function renderCityWeekTrend(rows) {
   const groupLabel = _cwtGroupBy === 'bucket' ? 'RCA Bucket' : 'SPOC';
   document.getElementById('city-week-badge').textContent =
     `${cities.length} cities × ${weeks.length} weeks · grouped by ${groupLabel}`;
+  setDuration('cwt-duration', weeks);
 
   function arrow(cur, prev) {
     if (prev === null || cur === null) return '';
@@ -1655,11 +1665,31 @@ function buildCitySpocData(rows) {
   return { cities, citySpocIGCC, cityUnic, spocs };
 }
 
+function setDuration(id, weeks) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!weeks || !weeks.length) { el.textContent = ''; el.style.display = 'none'; return; }
+  const sorted = [...weeks].sort((a, b) => +a - +b);
+  el.textContent = sorted.length === 1 ? `Wk ${sorted[0]}` : `Wk ${sorted[0]} – Wk ${sorted[sorted.length - 1]}`;
+  el.style.display = 'inline-flex';
+}
+
+function setDateDuration(id, dates) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!dates || !dates.length) { el.textContent = ''; el.style.display = 'none'; return; }
+  const sorted = [...dates].filter(Boolean).sort();
+  const fmt = d => { const p = d.split('-'); return `${p[2]}/${p[1]}/${p[0].slice(2)}`; };
+  el.textContent = sorted.length === 1 ? fmt(sorted[0]) : `${fmt(sorted[0])} – ${fmt(sorted[sorted.length - 1])}`;
+  el.style.display = 'inline-flex';
+}
+
 function renderSummaryTable(rows) {
   const { cities, citySpocIGCC, cityUnic, spocs } = buildCitySpocData(rows);
 
   document.getElementById('summary-badge').textContent = `${cities.length} cities × ${spocs.length} SPOCs`;
   document.getElementById('summary-info').textContent = `Sorted by Total IGCC ↓`;
+  setDuration('summary-duration', [...new Set(rows.map(r => r.week))]);
 
   // Grand totals per SPOC
   const grandSpoc = {};
@@ -1822,6 +1852,7 @@ function renderPivotTable(rows) {
   });
 
   document.getElementById('pivot-badge').textContent = `${weeks.length} weeks × ${spocs.length} SPOCs`;
+  setDuration('pivot-duration', weeks);
 
   const grandSpocIGCC = {};
   spocs.forEach(s => { grandSpocIGCC[s] = 0; });
@@ -2292,6 +2323,7 @@ function renderWsKPIs() {
     document.getElementById('ws-kpi-top-sub').textContent = `${top[1].toLocaleString('en-IN')} IGCC`;
   }
   document.getElementById('ws-count-label').textContent = `${rows.length.toLocaleString('en-IN')} rows`;
+  setDuration('ws-duration', [...weeks]);
 }
 
 function renderWsTable() {
@@ -2544,6 +2576,7 @@ function renderItemKPIs() {
   document.getElementById('item-kpi-rows').textContent     = rows.length.toLocaleString('en-IN');
   document.getElementById('item-kpi-igcc').textContent     = totalIGCC.toLocaleString('en-IN');
   document.getElementById('item-kpi-igcc-sub').textContent = `across ${[...new Set(rows.map(r=>r.CITY))].length} cities`;
+  setDateDuration('daily-duration', [...new Set(rows.map(r => r.DT))]);
   document.getElementById('item-kpi-orders').textContent   = totalOrders.toLocaleString('en-IN');
   document.getElementById('item-kpi-rate').textContent     = rate;
   if (topEntry) {
