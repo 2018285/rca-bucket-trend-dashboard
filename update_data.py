@@ -2,40 +2,53 @@
 """
 update_data.py
 Downloads the latest CSVs from Google Drive and pushes to GitHub.
-Scheduled to run at 10:30 AM and 3:00 PM IST via Windows Task Scheduler.
+On any failure, sends an alert email via Gmail to selvakumar.s@scootsy.com.
+Scheduled via Windows Task Scheduler at 10:30 AM and 3:00 PM IST daily.
 """
 
-import io
 import sys
+import smtplib
 import logging
 import subprocess
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from pathlib import Path
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+import gdown
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCOPES          = ['https://www.googleapis.com/auth/drive.readonly']
-DRIVE_FOLDER_ID = '1dWSFOJK_hAMDlIcxGHH8RPihTqhd7OIf'
 SCRIPT_DIR      = Path(__file__).parent
-TOKEN_PATH      = SCRIPT_DIR / 'token.json'
-CREDS_PATH      = SCRIPT_DIR / 'credentials.json'
 LOG_PATH        = SCRIPT_DIR / 'update_log.txt'
+DASHBOARD_NAME  = 'RCA Bucket Trend Dashboard'
+DASHBOARD_URL   = 'https://2018285.github.io/rca-bucket-trend-dashboard/dashboard.html'
+DRIVE_FOLDER_ID = '1dWSFOJK_hAMDlIcxGHH8RPihTqhd7OIf'
+DRIVE_FOLDER_URL = f'https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID}'
 
-# (drive_name_contains, drive_name_must_NOT_contain) → local filename
-FILE_MAP = [
-    (('Item_level_daily',    None),   'IGCC-RCA-Appsheet Summary - Item_level_daily.csv'),
-    (('Item_level_weekly',   None),   'IGCC-RCA-Appsheet Summary - Item_level_weekly.csv'),
-    (('Spoc_level (D-2)',    None),   'IGCC-RCA-Appsheet Summary - Spoc_level (D-2).csv'),
-    (('Spoc_level',          'D-2'),  'IGCC-RCA-Appsheet Summary - Spoc_level.csv'),
-    (('Daily-RCA-Summary',   None),   'Weekly RCA bucket sumarry - Daily-RCA-Summary.csv'),
-    (('WeeklyRCA-Summary',   None),   'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv'),
-    (('City List',           None),   'Weekly RCA bucket sumarry - City List.csv'),
-]
+# Email config — Gmail SMTP with App Password
+EMAIL_FROM    = 'selvakumar.s@scootsy.com'
+EMAIL_TO      = 'selvakumar.s@scootsy.com'
+# Store your Gmail App Password in a file called email_password.txt next to this script.
+# (Google Account → Security → 2-Step Verification → App passwords → generate one)
+EMAIL_PASS_FILE = SCRIPT_DIR / 'email_password.txt'
+
+# Drive file ID → local filename
+STATIC_FILE_MAP = {
+    'Item_level_daily':  ('1KJZ4_02wva77DJobW3k7wELS3Dh7slml',
+                          'IGCC-RCA-Appsheet Summary - Item_level_daily.csv'),
+    'Item_level_weekly': ('10xjAlXibnSJA8eg2rQPAzjOu9I6HhurZ',
+                          'IGCC-RCA-Appsheet Summary - Item_level_weekly.csv'),
+    'Spoc_level':        ('1B2eOucZ-kDSRyHPQpmOhFWWogAU1EPzJ',
+                          'IGCC-RCA-Appsheet Summary - Spoc_level.csv'),
+    'Spoc_level (D-2)':  ('16xGp3qRX1J1Ach6sepB9m7tCU3YFugKr',
+                          'IGCC-RCA-Appsheet Summary - Spoc_level (D-2).csv'),
+    'Daily-RCA-Summary': ('1vtjpTn5FO8iCiLc-4sjLnMIaMj2KjlFh',
+                          'Weekly RCA bucket sumarry - Daily-RCA-Summary.csv'),
+    'WeeklyRCA-Summary': ('1HIX010n_XTAoWzhSmGguCwhUYmdSKbk-',
+                          'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv'),
+    'City List':         ('1BQqg3EupdThqmFw6x8NS3pgGPinMdNy6',
+                          'Weekly RCA bucket sumarry - City List.csv'),
+}
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -49,59 +62,103 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# ── Google Drive Auth ─────────────────────────────────────────────────────────
-def get_credentials():
-    creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not CREDS_PATH.exists():
-                log.error('credentials.json not found at %s', CREDS_PATH)
-                log.error('See SETUP.md for instructions to create it.')
-                sys.exit(1)
-            flow = InstalledAppFlow.from_client_secrets_file(str(CREDS_PATH), SCOPES)
-            creds = flow.run_local_server(port=0)
-        TOKEN_PATH.write_text(creds.to_json(), encoding='utf-8')
-    return creds
+# ── Email alert ───────────────────────────────────────────────────────────────
+def send_alert(subject, failed_files, push_error=None):
+    """Send failure alert email. Skips silently if no password file."""
+    if not EMAIL_PASS_FILE.exists():
+        log.warning('email_password.txt not found — skipping email alert.')
+        return
 
+    password = EMAIL_PASS_FILE.read_text(encoding='utf-8').strip()
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M IST')
 
-# ── Drive helpers ─────────────────────────────────────────────────────────────
-def find_latest_file(service, must_contain, must_not_contain):
-    """Return (file_id, file_name) of the newest matching file in the Drive folder."""
-    # Escape single quotes in the search term
-    escaped = must_contain.replace("'", "\\'")
-    q = (
-        f"'{DRIVE_FOLDER_ID}' in parents"
-        f" and name contains '{escaped}'"
-        f" and mimeType != 'application/vnd.google-apps.folder'"
-        f" and trashed = false"
+    # Build HTML body
+    rows = ''.join(
+        f'<tr><td style="padding:8px 12px;border-bottom:1px solid #2d3055;">'
+        f'<b>{label}</b></td>'
+        f'<td style="padding:8px 12px;border-bottom:1px solid #2d3055;color:#f87171;">{reason}</td>'
+        f'<td style="padding:8px 12px;border-bottom:1px solid #2d3055;color:#8892b0;">{local}</td></tr>'
+        for label, reason, local in failed_files
     )
-    result = service.files().list(
-        q=q,
-        orderBy='modifiedTime desc',
-        pageSize=10,
-        fields='files(id,name,modifiedTime)'
-    ).execute()
-    items = result.get('files', [])
-    if must_not_contain:
-        items = [f for f in items if must_not_contain not in f['name']]
-    if not items:
-        return None, None
-    return items[0]['id'], items[0]['name']
+
+    push_section = ''
+    if push_error:
+        push_section = f'''
+        <div style="margin-top:20px;padding:14px 18px;background:#1a1d2e;border-radius:8px;
+                    border-left:4px solid #ef4444;">
+          <b style="color:#f87171;">&#9888; GitHub Push Failed</b>
+          <pre style="margin-top:8px;color:#8892b0;font-size:12px;
+                      white-space:pre-wrap;">{push_error}</pre>
+        </div>'''
+
+    html = f'''
+    <html><body style="background:#0f1117;color:#e2e8f0;
+                        font-family:'Segoe UI',system-ui,sans-serif;padding:24px;">
+      <div style="max-width:680px;margin:0 auto;">
+
+        <h2 style="color:#f87171;margin-bottom:4px;">
+          &#9888; Data Update Failed — {DASHBOARD_NAME}
+        </h2>
+        <p style="color:#8892b0;margin-top:0;">{ts}</p>
+
+        <p>The scheduled data refresh encountered errors for the following files.
+           The dashboard may be showing <b>outdated data</b> until these are resolved.</p>
+
+        <table style="width:100%;border-collapse:collapse;background:#1a1d2e;
+                      border-radius:10px;overflow:hidden;margin:16px 0;">
+          <thead>
+            <tr style="background:#222539;">
+              <th style="padding:10px 12px;text-align:left;color:#4f8ef7;">File</th>
+              <th style="padding:10px 12px;text-align:left;color:#4f8ef7;">Error</th>
+              <th style="padding:10px 12px;text-align:left;color:#4f8ef7;">Local Name</th>
+            </tr>
+          </thead>
+          <tbody>{rows}</tbody>
+        </table>
+
+        {push_section}
+
+        <div style="margin-top:24px;padding:14px 18px;background:#1a1d2e;
+                    border-radius:8px;border-left:4px solid #4f8ef7;">
+          <b style="color:#4f8ef7;">Action Required</b>
+          <ol style="margin-top:8px;color:#8892b0;padding-left:18px;line-height:1.8;">
+            <li>Open the <a href="{DRIVE_FOLDER_URL}" style="color:#4f8ef7;">
+                Google Drive folder</a> and verify the files are present and up to date.</li>
+            <li>If files are missing, upload the latest exports to the Drive folder.</li>
+            <li>Re-run <code style="background:#222539;padding:2px 6px;border-radius:4px;">
+                python update_data.py</code> manually to retry.</li>
+          </ol>
+        </div>
+
+        <p style="margin-top:20px;color:#8892b0;font-size:12px;">
+          Dashboard: <a href="{DASHBOARD_URL}" style="color:#4f8ef7;">{DASHBOARD_URL}</a><br>
+          Log file: <code>update_log.txt</code> in the project folder
+        </p>
+      </div>
+    </body></html>
+    '''
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From']    = EMAIL_FROM
+    msg['To']      = EMAIL_TO
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(EMAIL_FROM, password)
+            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        log.info('Alert email sent to %s', EMAIL_TO)
+    except Exception as exc:
+        log.error('Failed to send email: %s', exc)
 
 
-def download_file(service, file_id, dest_path):
-    """Download a Drive file by ID to dest_path."""
-    request = service.files().get_media(fileId=file_id)
-    buf = io.BytesIO()
-    downloader = MediaIoBaseDownload(buf, request, chunksize=10 * 1024 * 1024)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
-    dest_path.write_bytes(buf.getvalue())
+# ── Download ──────────────────────────────────────────────────────────────────
+def download(file_id, dest_path):
+    url = f'https://drive.google.com/uc?id={file_id}'
+    gdown.download(url, str(dest_path), quiet=False)
+    if not dest_path.exists() or dest_path.stat().st_size == 0:
+        raise RuntimeError('Download produced empty file — file may not be publicly shared')
 
 
 # ── Git push ──────────────────────────────────────────────────────────────────
@@ -109,68 +166,63 @@ def git_push(commit_message):
     def run(cmd, check=False):
         r = subprocess.run(cmd, cwd=SCRIPT_DIR, capture_output=True, text=True)
         if r.returncode != 0 and check:
-            log.error('Command failed: %s\n%s', ' '.join(cmd), r.stderr.strip())
-            sys.exit(1)
+            raise RuntimeError(f"git {' '.join(cmd[1:])} failed:\n{r.stderr.strip()}")
         return r
 
     run(['git', 'add', '-A'])
-
     status = run(['git', 'status', '--porcelain'])
     if not status.stdout.strip():
         log.info('No changes to commit — CSV files unchanged.')
-        return False
+        return True, None
 
-    r = run(['git', 'commit', '-m', commit_message], check=True)
-    log.info('Committed: %s', r.stdout.strip())
-
-    r = run(['git', 'push', 'origin', 'master'], check=True)
-    log.info('Pushed to GitHub → https://2018285.github.io/rca-bucket-trend-dashboard/dashboard.html')
-    return True
+    run(['git', 'commit', '-m', commit_message], check=True)
+    log.info('Committed.')
+    run(['git', 'push', 'origin', 'master'], check=True)
+    log.info('Pushed → %s', DASHBOARD_URL)
+    return True, None
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     log.info('=' * 60)
-    log.info('Data update started at %s IST', datetime.now().strftime('%Y-%m-%d %H:%M'))
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M')
+    log.info('Data update started  %s IST', ts)
 
-    creds   = get_credentials()
-    service = build('drive', 'v3', credentials=creds)
+    updated      = []
+    failed_files = []   # (label, error_reason, local_name)
 
-    updated = []
-    errors  = []
-
-    for (must_contain, must_not), local_name in FILE_MAP:
-        log.info('Looking for: %s', must_contain)
+    for label, (file_id, local_name) in STATIC_FILE_MAP.items():
+        dest = SCRIPT_DIR / local_name
+        log.info('Downloading: %s', label)
         try:
-            fid, drive_name = find_latest_file(service, must_contain, must_not)
-            if not fid:
-                log.warning('  Not found in Drive, skipping: %s', local_name)
-                errors.append(local_name)
-                continue
-            log.info('  Matched: %s', drive_name)
-            dest = SCRIPT_DIR / local_name
-            download_file(service, fid, dest)
+            download(file_id, dest)
             sz = dest.stat().st_size
-            log.info('  Saved → %s  (%s KB)', dest.name, sz // 1024)
+            log.info('  OK → %s  (%s KB)', local_name, sz // 1024)
             updated.append(local_name)
         except Exception as exc:
-            log.error('  Error downloading %s: %s', local_name, exc)
-            errors.append(local_name)
+            reason = str(exc).split('\n')[0][:120]
+            log.error('  FAILED %s: %s', local_name, reason)
+            failed_files.append((label, reason, local_name))
 
-    log.info('Downloaded %d/%d files', len(updated), len(FILE_MAP))
+    log.info('Downloaded %d/%d files', len(updated), len(STATIC_FILE_MAP))
 
-    if errors:
-        log.warning('Skipped: %s', ', '.join(errors))
-
-    if not updated:
+    push_error = None
+    if updated:
+        msg = f'Auto data update {ts} IST ({len(updated)} files refreshed)'
+        try:
+            git_push(msg)
+            log.info('Live dashboard updated successfully.')
+        except RuntimeError as exc:
+            push_error = str(exc)
+            log.error('Git push failed: %s', push_error)
+    else:
         log.warning('Nothing downloaded — skipping git push.')
-        return
 
-    ts  = datetime.now().strftime('%Y-%m-%d %H:%M')
-    msg = f'Auto data update: {ts} IST ({len(updated)} files refreshed)'
-    pushed = git_push(msg)
-    if pushed:
-        log.info('Live dashboard updated successfully.')
+    # Send alert if anything failed
+    if failed_files or push_error:
+        subject = f'[{DASHBOARD_NAME}] Data Update Failed — {ts} IST'
+        send_alert(subject, failed_files, push_error)
+
     log.info('=' * 60)
 
 

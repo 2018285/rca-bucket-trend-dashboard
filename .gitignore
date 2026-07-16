@@ -3,6 +3,7 @@
 credentials.json
 token.json
 .github_token
+email_password.txt
 update_log.txt
 __pycache__/
 *.pyc
