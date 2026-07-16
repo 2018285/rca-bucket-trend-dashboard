@@ -1,6 +1,8 @@
-<<<<<<< HEAD
-# No exclusions — CSVs are committed so GitHub Pages can serve live data
-=======
-# Token file - never commit this
+# CSVs are committed so GitHub Pages can serve live data
+# Secrets — never commit
+credentials.json
+token.json
 .github_token
->>>>>>> origin/main
+update_log.txt
+__pycache__/
+*.pyc
