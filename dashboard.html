@@ -43,7 +43,7 @@
   #app { display: none; padding: 16px; max-width: 1800px; margin: 0 auto; }
 
   /* Header */
-  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; row-gap: 10px; }
   .header h1 { font-size: 20px; font-weight: 700; color: #fff; }
   .header h1 span { color: var(--primary); }
   .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -52,7 +52,18 @@
   .btn-primary:hover { background: #3b7de8; }
   .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
   .btn-outline:hover { background: var(--surface2); }
-  .header-actions { display: flex; gap: 8px; }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  /* Global search + active filter bar */
+  .global-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .global-search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 360px; }
+  .global-search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px 8px 34px; color: var(--text); font-size: 13px; outline: none; }
+  .global-search-wrap input:focus { border-color: var(--primary); }
+  .global-search-wrap::before { content: '🔍'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; pointer-events: none; }
+  .active-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; align-items: center; }
+  .active-chip { display: inline-flex; align-items: center; gap: 5px; background: rgba(79,142,247,0.15); border: 1px solid rgba(79,142,247,0.4); color: #93c5fd; border-radius: 99px; font-size: 11px; font-weight: 600; padding: 3px 10px; white-space: nowrap; }
+  .active-chip .chip-x { cursor: pointer; color: rgba(147,197,253,0.6); font-size: 13px; line-height: 1; margin-left: 2px; }
+  .active-chip .chip-x:hover { color: #fff; }
+  .active-chips-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
   /* Filters */
   .filters-bar {
@@ -96,13 +107,14 @@
   .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
   .chart-card.full { grid-column: 1 / -1; }
-  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; flex-shrink: 1; }
   .chart-title .badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 99px; color: var(--muted); font-weight: 400; }
   .chart-canvas-wrap { position: relative; }
 
   /* Table */
   .table-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
-  .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .table-toolbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; row-gap: 8px; }
+  .table-toolbar-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .table-info { font-size: 12px; color: var(--muted); }
   .table-scroll { overflow: auto; max-height: 380px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -270,7 +282,7 @@
   .item-subpane { display: none; }
   .item-subpane.active { display: block; }
   /* Duration highlight badge */
-  .duration-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.13); color:#a5b4fc; border:1px solid rgba(99,102,241,0.35); border-radius:6px; font-size:11px; font-weight:700; padding:2px 8px; margin-left:8px; white-space:nowrap; vertical-align:middle; }
+  .duration-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(99,102,241,0.13); color:#a5b4fc; border:1px solid rgba(99,102,241,0.35); border-radius:6px; font-size:11px; font-weight:700; padding:2px 8px; white-space:nowrap; vertical-align:middle; }
   .duration-badge::before { content:'📅'; font-size:10px; }
 
   /* Bucket pills for weekly summary */
@@ -323,6 +335,16 @@
   <!-- ═══════════════════════════════════════ TAB 1: TREND ═══════════════════════════════════════ -->
   <div id="tab-trend" class="tab-pane active">
 
+  <!-- Global search + active filter chips -->
+  <div class="global-bar">
+    <div class="global-search-wrap">
+      <input type="text" id="global-search" placeholder="Search city, bucket, SPOC…">
+    </div>
+    <div class="active-filter-chips" id="active-filter-chips">
+      <span class="active-chips-label" id="chips-label" style="display:none;">Active filters:</span>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="filters-bar">
     <div class="filter-group">
@@ -356,7 +378,7 @@
         <span class="badge" id="pivot-badge">—</span>
         <span class="duration-badge" id="pivot-duration"></span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="table-toolbar-right">
         <span class="table-info" id="pivot-info"></span>
         <button class="btn btn-outline" id="download-pivot-btn" style="font-size:12px;padding:6px 12px;">⬇ Download Pivot CSV</button>
       </div>
@@ -373,7 +395,7 @@
         <span class="badge" id="summary-badge">—</span>
         <span class="duration-badge" id="summary-duration"></span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="table-toolbar-right">
         <span class="table-info" id="summary-info"></span>
         <button class="btn btn-outline" id="download-summary-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
       </div>
@@ -391,7 +413,7 @@
         <span class="badge" id="city-week-badge">—</span>
         <span class="duration-badge" id="cwt-duration"></span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="table-toolbar-right">
         <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click city to expand</span>
         <span style="font-size:11px;color:var(--muted);">Group by:</span>
         <button class="btn btn-outline cwt-group-btn active" id="cwt-grp-bucket" onclick="cwtSetGroup('bucket')" style="font-size:12px;padding:5px 12px;">RCA Bucket</button>
@@ -515,7 +537,7 @@
           <label>RCA Bucket</label>
           <select id="ws-filter-bucket" multiple placeholder="All Buckets"></select>
         </div>
-        <div class="filter-group" style="justify-content:flex-end;align-self:flex-end;flex-direction:row;gap:6px;padding-bottom:2px;">
+        <div class="filter-group" style="justify-content:flex-end;align-self:flex-end;flex-direction:row;flex-wrap:wrap;gap:6px;padding-bottom:2px;align-items:center;">
           <input class="item-search" id="ws-search" type="text" placeholder="Search item..." style="height:34px;padding:0 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;min-width:160px;">
           <button class="btn btn-outline" id="ws-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
           <button class="btn btn-outline" id="ws-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
@@ -598,7 +620,7 @@
             <label>Search</label>
             <input class="item-search" id="item-search" type="text" placeholder="Item name, code, city, SPOC, bucket...">
           </div>
-          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;gap:6px;">
+          <div class="item-filter-group" style="align-self:flex-end;flex-direction:row;flex-wrap:wrap;gap:6px;align-items:center;">
             <button class="btn btn-outline" id="item-reset-btn" style="font-size:12px;padding:7px 14px;">Reset</button>
             <button class="btn btn-outline" id="item-download-btn" style="font-size:12px;padding:7px 14px;">⬇ CSV</button>
             <span class="item-count" id="item-count-label" style="line-height:34px;"></span>
@@ -729,7 +751,7 @@ let TIER1_CITIES = new Set([
 ]);
 let TIER2_CITIES = new Set();  // populated from sheet; if empty, all non-T1 cities are T2
 
-const CITY_LIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjn6eDILDUnEYoYnjESkCoKxgwPBSUspiO_B8wqYebfYU8vaM2NJOaAqi7-FPFEc6YT21twNB2RXbf/pub?gid=928301632&single=true&output=csv';
+const CITY_LIST_URL = 'Weekly RCA bucket sumarry - City List.csv';
 
 async function loadCityTiers() {
   try {
@@ -755,8 +777,8 @@ async function loadCityTiers() {
         const city = (r[cityCol] || '').trim();
         const tier = String(r[tierCol] || '').trim();
         if (!city) return;
-        if (tier === '1') t1.add(city);
-        else if (tier === '2') t2.add(city);
+        if (tier === '1' || tier === 'Tier_1') t1.add(city);
+        else if (tier === '2' || tier === 'Tier_2') t2.add(city);
       });
       if (t1.size) TIER1_CITIES = t1;
       if (t2.size) TIER2_CITIES = t2;
@@ -790,7 +812,7 @@ function selectTier(tier) {
   onFilterChange();
 }
 
-let filterState = { weeks: [], cities: [], spocs: [], buckets: [] };
+let filterState = { weeks: [], cities: [], spocs: [], buckets: [], globalQ: '' };
 let charts = {};
 let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
 const PAGE_SIZE = 100;
@@ -953,6 +975,13 @@ function initApp() {
     onChange: onFilterChange
   });
 
+  // Global search input
+  const gsEl = document.getElementById('global-search');
+  if (gsEl) {
+    let gsTimer;
+    gsEl.addEventListener('input', () => { clearTimeout(gsTimer); gsTimer = setTimeout(onFilterChange, 260); });
+  }
+
   // Reset button
   document.getElementById('reset-btn').addEventListener('click', () => {
     tsWeek.clear(true);
@@ -961,6 +990,8 @@ function initApp() {
     tsBucket.clear(true);
     document.getElementById('tier1-btn').classList.remove('active');
     document.getElementById('tier2-btn').classList.remove('active');
+    const gs = document.getElementById('global-search');
+    if (gs) gs.value = '';
     onFilterChange();
   });
 
@@ -981,6 +1012,8 @@ function onFilterChange() {
   filterState.cities  = tsCity   ? tsCity.getValue()   : [];
   filterState.spocs   = tsSpoc   ? tsSpoc.getValue()   : [];
   filterState.buckets = tsBucket ? tsBucket.getValue() : [];
+  filterState.globalQ = (document.getElementById('global-search')?.value || '').toLowerCase().trim();
+  updateActiveChips();
   const rows = getFilteredRows();
   const agg  = computeAggregates(rows);
   renderSummaryTable(rows);
@@ -991,12 +1024,49 @@ function onFilterChange() {
   renderPivotTable(rows);
 }
 
+function updateActiveChips() {
+  const container = document.getElementById('active-filter-chips');
+  const label = document.getElementById('chips-label');
+  const chips = [];
+  const add = (type, label, rawVal, ts) => chips.push({ type, label, rawVal, ts });
+  filterState.weeks.forEach(w   => add('week',   `Week ${w}`,  w,  tsWeek));
+  filterState.cities.forEach(c  => add('city',   c,            c,  tsCity));
+  filterState.spocs.forEach(s   => add('spoc',   s,            s,  tsSpoc));
+  filterState.buckets.forEach(b => add('bucket', b,            b,  tsBucket));
+  if (filterState.globalQ)        add('search',  `"${filterState.globalQ}"`, null, null);
+
+  // Remove old chips (keep label)
+  [...container.querySelectorAll('.active-chip')].forEach(el => el.remove());
+  label.style.display = chips.length ? 'inline' : 'none';
+
+  chips.forEach(({ type, label, rawVal, ts }) => {
+    const chip = document.createElement('span');
+    chip.className = 'active-chip';
+    chip.innerHTML = `<span style="opacity:.6;font-size:10px;">${type}</span> ${label} <span class="chip-x" title="Remove">×</span>`;
+    chip.querySelector('.chip-x').addEventListener('click', () => {
+      if (type === 'search') {
+        document.getElementById('global-search').value = '';
+      } else if (ts && rawVal !== null) {
+        ts.removeItem(rawVal, true);
+        if (type === 'city') { document.getElementById('tier1-btn').classList.remove('active'); document.getElementById('tier2-btn').classList.remove('active'); }
+      }
+      onFilterChange();
+    });
+    container.appendChild(chip);
+  });
+}
+
 function getFilteredRows() {
+  const q = filterState.globalQ;
   return aggregatedCube.filter(r => {
     if (filterState.weeks.length   && !filterState.weeks.includes(r.week))   return false;
     if (filterState.cities.length  && !filterState.cities.includes(r.city))  return false;
     if (filterState.spocs.length   && !filterState.spocs.includes(r.spoc))   return false;
     if (filterState.buckets.length && !filterState.buckets.includes(r.bucket)) return false;
+    if (q) {
+      const hay = `${r.city} ${r.bucket} ${r.spoc}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
 }
