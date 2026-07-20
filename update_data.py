@@ -174,7 +174,7 @@ def git_push(commit_message):
     run(['git', 'commit', '-m', commit_message], check=True)
     log.info('Committed.')
     run(['git', 'push', 'origin', 'master'], check=True)
-    log.info('Pushed → %s', DASHBOARD_URL)
+    log.info('Pushed -> %s', DASHBOARD_URL)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ def main():
         try:
             src_name = copy_latest(prefix, dest)
             sz = dest.stat().st_size
-            log.info('  OK → %s  (%s KB)  [from %s]', dest_name, sz // 1024, src_name)
+            log.info('  OK -> %s  (%s KB)  [from %s]', dest_name, sz // 1024, src_name)
             updated.append(dest_name)
         except Exception as exc:
             reason = str(exc).split('\n')[0][:120]
