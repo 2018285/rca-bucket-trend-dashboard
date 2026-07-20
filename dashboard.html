@@ -2537,20 +2537,33 @@ async function loadDailyData() {
     `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">Loading daily data…</td></tr>`;
 
   await new Promise((resolve, reject) => {
-    Papa.parse('Weekly RCA bucket sumarry - Daily-RCA-Summary.csv', {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_daily.csv', {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
-        dailyRows = data.map(row => ({
-          DT:   (() => { const MMAP={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'}; const raw = String(row.DATE || row.DT || '').trim(); if (!raw) return ''; const sp = raw.split('/'); if (sp.length === 3) return `${sp[2].slice(0,4)}-${sp[0].padStart(2,'0')}-${sp[1].padStart(2,'0')}`; const lm = raw.match(/(\w{3}) (\d{1,2}) (\d{4})/); if (lm && MMAP[lm[1]]) return `${lm[3]}-${MMAP[lm[1]]}-${String(lm[2]).padStart(2,'0')}`; return raw; })(),
-          WEEK: String(row.WEEK || row['﻿WEEK'] || '').trim(),
-          CITY: String(row.CITY || '').trim(),
-          ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
-          ITEM_NAME:     String(row.ITEM_NAME || '').trim(),
-          IGCC:   parseInt(row['Total IGCC'] || row.IGCC, 10) || 0,
-          ORDERS: parseInt(row['Unique Order Numbers'] || row.ORDERS, 10) || 0,
-          'Reason Summary': String(row['Reason Summary'] || '').trim(),
-          _buckets: parseReasonSummary(String(row['Reason Summary'] || '').trim())
-        })).filter(r => r.DT && r.CITY);
+        const MMAP={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const parseDate = raw => {
+          if (!raw) return '';
+          const sp = raw.split('/');
+          if (sp.length === 3) return `${sp[2].slice(0,4)}-${sp[0].padStart(2,'0')}-${sp[1].padStart(2,'0')}`;
+          const lm = raw.match(/(\w{3}) (\d{1,2}) (\d{4})/);
+          if (lm && MMAP[lm[1]]) return `${lm[3]}-${MMAP[lm[1]]}-${String(lm[2]).padStart(2,'0')}`;
+          return raw;
+        };
+        dailyRows = data.map(row => {
+          const reason = String(row['Basic Reason for IGCC'] || row['Reason Summary'] || '').trim();
+          return {
+            DT:            parseDate(String(row.DT || row.DATE || '').trim()),
+            WEEK:          String(row.WEEK || row['﻿WEEK'] || '').trim(),
+            CITY:          String(row.CITY || '').trim(),
+            ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
+            ITEM_NAME:     String(row.ITEM_NAME || '').trim(),
+            SPOC:          String(row.SPOC || '').trim(),
+            IGCC:          parseInt(row.IGCC || row['Total IGCC'], 10) || 0,
+            ORDERS:        parseInt(row.ORDERS || row['Unique Order Numbers'], 10) || 0,
+            'Reason Summary': reason,
+            _buckets:      (parseReasonSummary(reason).length ? parseReasonSummary(reason) : (reason ? [{bucket: reason, count: 1}] : []))
+          };
+        }).filter(r => r.DT && r.CITY);
         resolve();
       },
       error: reject
