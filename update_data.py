@@ -174,6 +174,7 @@ def git_push(commit_message):
     run(['git', 'commit', '-m', commit_message], check=True)
     log.info('Committed.')
     run(['git', 'push', 'origin', 'master'], check=True)
+    run(['git', 'push', 'origin', 'master:main'], check=True)
     log.info('Pushed -> %s', DASHBOARD_URL)
 
 
