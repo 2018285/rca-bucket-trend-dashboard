@@ -2046,7 +2046,7 @@ function renderStoreTrend() {
         html += `<td class="cwt-sub-label" title="Store ID: ${storeId} — click to view SPOC breakdown">
           <span class="cwt-toggle-icon">${isStoreOpen ? '▼' : '▶'}</span>
           <span class="cwt-sub-dot" style="background:${color};"></span>
-          <span class="cwt-sub-name">${storeName(storeId)}</span>
+          <span class="cwt-sub-name">${storeName(storeId)} <span style="color:var(--muted);font-weight:400;">(${storeId})</span></span>
           <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
         </td>`;
         periods.forEach((p, pi) => {
