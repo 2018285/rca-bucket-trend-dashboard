@@ -408,6 +408,27 @@
     </div>
   </div>
 
+  <!-- Store × Week/Day Trend Table with Weekly/Daily toggle -->
+  <div class="table-section" style="margin-bottom:16px;">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        Store × Week IGCC Rate Trend
+        <span class="badge" id="store-trend-badge">—</span>
+        <span class="duration-badge" id="store-trend-duration"></span>
+      </div>
+      <div class="table-toolbar-right">
+        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click city to expand stores</span>
+        <span style="font-size:11px;color:var(--muted);">View:</span>
+        <button class="btn btn-outline cwt-group-btn active" id="st-mode-weekly" onclick="storeTrendSetMode('weekly')" style="font-size:12px;padding:5px 12px;">Weekly</button>
+        <button class="btn btn-outline cwt-group-btn"        id="st-mode-daily"  onclick="storeTrendSetMode('daily')"  style="font-size:12px;padding:5px 12px;">Daily</button>
+        <button class="btn btn-outline" id="download-store-trend-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:520px;margin-top:12px;">
+      <div id="store-trend-container"></div>
+    </div>
+  </div>
+
   <!-- City × Week Trend Table with Group-by toggle -->
   <div class="table-section" style="margin-bottom:16px;">
     <div class="table-toolbar">
@@ -746,6 +767,9 @@ Chart.defaults.font.size = 12;
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
 let rawItemRows = [];       // raw rows from Item_level_weekly.csv
+let storeWeeklyRows = [];   // {week, city, storeId, spoc, orders, igcc}
+let storeDailyRows = [];    // {date, week, city, storeId, spoc, orders, igcc}
+let podNameMap = {};        // STORE_ID -> POD Name (from fnv_pod_sales_all.csv)
 // Tier city definitions — loaded dynamically from Google Sheet "City List" tab
 // Fallback hardcoded list used if sheet is unreachable
 let TIER1_CITIES = new Set([
@@ -917,9 +941,85 @@ async function loadData() {
   setProgress(90);
   setLoadText(`Ready — ${aggregatedCube.length.toLocaleString()} aggregated combinations`);
 
+  setLoadText('Loading store-wise data (Store_L1_wk / Store_L1_daily)...');
+  await loadStoreTrendData();
+
   await new Promise(r => setTimeout(r, 400));
   setProgress(100);
   initApp();
+}
+
+// ─────────────────────────────────────────────
+// STORE-WISE TREND DATA (Store_L1_wk, Store_L1_daily, fnv_pod_sales_all)
+// ─────────────────────────────────────────────
+async function loadStoreTrendData() {
+  const MMAP = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  const parseDate = raw => {
+    if (!raw) return '';
+    const sp = String(raw).split('/');
+    if (sp.length === 3) return `${sp[2].slice(0,4)}-${sp[0].padStart(2,'0')}-${sp[1].padStart(2,'0')}`;
+    const lm = String(raw).match(/(\w{3}) (\d{1,2}) (\d{4})/);
+    if (lm && MMAP[lm[1]]) return `${lm[3]}-${MMAP[lm[1]]}-${String(lm[2]).padStart(2,'0')}`;
+    return String(raw);
+  };
+
+  const weeklyP = new Promise((resolve) => {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Store_L1_wk.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: ({ data }) => {
+        storeWeeklyRows = data.map(row => ({
+          week:    String(row.WEEK || row['﻿WEEK'] || '').trim(),
+          city:    String(row.CITY || '').trim(),
+          storeId: String(row.STORE_ID || '').trim(),
+          spoc:    String(row.SPOC || '').trim() || '<NA>',
+          orders:  parseInt(row.ORDERS_TOTAL, 10) || 0,
+          igcc:    parseInt(row.IGCC, 10) || 0
+        })).filter(r => r.week && r.city && r.storeId);
+        resolve();
+      },
+      error: () => { storeWeeklyRows = []; resolve(); }
+    });
+  });
+
+  const dailyP = new Promise((resolve) => {
+    Papa.parse('IGCC-RCA-Appsheet Summary - Store_L1_daily.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: ({ data }) => {
+        storeDailyRows = data.map(row => ({
+          date:    parseDate(row.DT),
+          week:    String(row.WEEK || row['﻿WEEK'] || '').trim(),
+          city:    String(row.CITY || '').trim(),
+          storeId: String(row.STORE_ID || '').trim(),
+          spoc:    String(row.SPOC || '').trim() || '<NA>',
+          orders:  parseInt(row.ORDERS_TOTAL, 10) || 0,
+          igcc:    parseInt(row.IGCC, 10) || 0
+        })).filter(r => r.date && r.city && r.storeId);
+        resolve();
+      },
+      error: () => { storeDailyRows = []; resolve(); }
+    });
+  });
+
+  const podP = new Promise((resolve) => {
+    Papa.parse('fnv_pod_sales_all.csv', {
+      download: true, header: true, skipEmptyLines: true,
+      complete: ({ data }) => {
+        data.forEach(row => {
+          const id   = String(row['POD ID'] || '').trim();
+          const name = String(row['POD Name'] || '').trim();
+          if (id && name && !podNameMap[id]) podNameMap[id] = name;
+        });
+        resolve();
+      },
+      error: () => resolve()
+    });
+  });
+
+  await Promise.all([weeklyP, dailyP, podP]);
+}
+
+function storeName(storeId) {
+  return podNameMap[storeId] || `Store ${storeId}`;
 }
 
 // ─────────────────────────────────────────────
@@ -1003,6 +1103,7 @@ function initApp() {
   document.getElementById('download-pivot-btn').addEventListener('click', downloadPivotCSV);
   document.getElementById('download-summary-btn').addEventListener('click', downloadSummaryCSV);
   document.getElementById('download-cwt-btn').addEventListener('click', downloadCwtCSV);
+  document.getElementById('download-store-trend-btn').addEventListener('click', downloadStoreTrendCSV);
   initCharts();
   onFilterChange();
 }
@@ -1026,6 +1127,11 @@ async function refreshAllData() {
   aggregatedCube = [];
   unicOrdersMap  = {};
   rawItemRows    = [];
+  storeWeeklyRows = [];
+  storeDailyRows  = [];
+  podNameMap      = {};
+  _storeTrendMode = 'weekly';
+  _storeTrendExpanded = new Set();
 
   // Destroy weekly-summary Tom Selects and reset state
   if (wsTsWeek)   { try { wsTsWeek.destroy();   } catch(e){} wsTsWeek   = null; }
@@ -1069,9 +1175,26 @@ function onFilterChange() {
   renderSummaryTable(rows);
   _cwtExpanded = new Set();
   renderCityWeekTrend(rows);
+  _storeTrendExpanded = new Set();
+  renderStoreTrend();
   renderKPIs(agg);
   updateAllCharts(agg, rows);
   renderPivotTable(rows);
+}
+
+function getFilteredStoreRows() {
+  const q = filterState.globalQ;
+  const src = _storeTrendMode === 'daily' ? storeDailyRows : storeWeeklyRows;
+  return src.filter(r => {
+    if (filterState.weeks.length   && !filterState.weeks.includes(r.week))   return false;
+    if (filterState.cities.length  && !filterState.cities.includes(r.city)) return false;
+    if (filterState.spocs.length   && !filterState.spocs.includes(r.spoc))  return false;
+    if (q) {
+      const hay = `${r.city} ${r.spoc} ${storeName(r.storeId)} ${r.storeId}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
 }
 
 function updateActiveChips() {
@@ -1746,6 +1869,277 @@ function renderCityWeekTrend(rows) {
   html += '</tr></tfoot></table>';
 
   document.getElementById('city-week-trend-container').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+// STORE × WEEK/DAY TREND (Store_L1_wk / Store_L1_daily)
+// ─────────────────────────────────────────────
+let _storeTrendMode     = 'weekly';   // 'weekly' | 'daily'
+let _storeTrendExpanded = new Set();  // set of open city names
+
+function storeTrendSetMode(mode) {
+  if (_storeTrendMode === mode) return;
+  _storeTrendMode      = mode;
+  _storeTrendExpanded  = new Set();
+  document.querySelectorAll('#st-mode-weekly, #st-mode-daily').forEach(b => b.classList.remove('active'));
+  document.getElementById('st-mode-' + mode).classList.add('active');
+  renderStoreTrend();
+}
+
+function storeTrendToggle(city) {
+  if (_storeTrendExpanded.has(city)) _storeTrendExpanded.delete(city);
+  else _storeTrendExpanded.add(city);
+  renderStoreTrend();
+}
+
+function renderStoreTrend() {
+  const rows = getFilteredStoreRows();
+  const isDaily = _storeTrendMode === 'daily';
+  const periodKey = isDaily ? 'date' : 'week';
+
+  const periods = [...new Set(rows.map(r => r[periodKey]))]
+    .sort((a, b) => isDaily ? (a < b ? -1 : a > b ? 1 : 0) : (+a - +b));
+
+  const periodLabel = p => isDaily ? p.slice(5).split('-').reverse().join('/') : `W${p}`;
+
+  // orders per period+store (dedup — same ORDERS_TOTAL repeats across SPOC rows)
+  const psOrders = {};
+  rows.forEach(r => {
+    const k = `${r[periodKey]}|${r.storeId}`;
+    if (!(k in psOrders)) psOrders[k] = r.orders;
+  });
+
+  // igcc per period+store, and per period+city
+  const psIGCC = {};
+  const pcIGCC = {};
+  rows.forEach(r => {
+    const ks = `${r[periodKey]}|${r.storeId}`;
+    psIGCC[ks] = (psIGCC[ks] || 0) + r.igcc;
+    const kc = `${r[periodKey]}|${r.city}`;
+    pcIGCC[kc] = (pcIGCC[kc] || 0) + r.igcc;
+  });
+
+  // orders per period+city (sum of unique stores' orders)
+  const pcOrders = {};
+  const seenPS = new Set();
+  rows.forEach(r => {
+    const ks = `${r[periodKey]}|${r.storeId}`;
+    if (seenPS.has(ks)) return;
+    seenPS.add(ks);
+    const kc = `${r[periodKey]}|${r.city}`;
+    pcOrders[kc] = (pcOrders[kc] || 0) + (psOrders[ks] || 0);
+  });
+
+  // city + store totals (across all periods) for sort order
+  const cityTotal = {};
+  const storeTotal = {};
+  const storeCity = {};
+  const storeSpocIGCC = {};
+  rows.forEach(r => {
+    cityTotal[r.city] = (cityTotal[r.city] || 0) + r.igcc;
+    storeTotal[r.storeId] = (storeTotal[r.storeId] || 0) + r.igcc;
+    storeCity[r.storeId] = r.city;
+    if (!storeSpocIGCC[r.storeId]) storeSpocIGCC[r.storeId] = {};
+    storeSpocIGCC[r.storeId][r.spoc] = (storeSpocIGCC[r.storeId][r.spoc] || 0) + r.igcc;
+  });
+  const cities = Object.keys(cityTotal).sort((a, b) => cityTotal[b] - cityTotal[a]);
+
+  // grand totals per period
+  const periodTotals = {};
+  rows.forEach(r => {
+    if (!periodTotals[r[periodKey]]) periodTotals[r[periodKey]] = { igcc: 0, orders: 0, seen: new Set() };
+    periodTotals[r[periodKey]].igcc += r.igcc;
+    const ks = `${r[periodKey]}|${r.storeId}`;
+    if (!periodTotals[r[periodKey]].seen.has(ks)) {
+      periodTotals[r[periodKey]].seen.add(ks);
+      periodTotals[r[periodKey]].orders += psOrders[ks] || 0;
+    }
+  });
+
+  const totalStores = new Set(rows.map(r => r.storeId)).size;
+  document.getElementById('store-trend-badge').textContent =
+    `${cities.length} cities × ${totalStores.toLocaleString()} stores × ${periods.length} ${isDaily ? 'days' : 'weeks'}`;
+  if (isDaily) setDateDuration('store-trend-duration', periods);
+  else setDuration('store-trend-duration', periods);
+
+  function arrow(cur, prev) {
+    if (prev === null || cur === null) return '';
+    if (cur > prev * 1.02) return `<span class="cwt-arrow arr-up">▲</span>`;
+    if (cur < prev * 0.98) return `<span class="cwt-arrow arr-dn">▼</span>`;
+    return `<span class="cwt-arrow arr-flat">●</span>`;
+  }
+  function rateStyle(rate) {
+    const bg    = rate > 2 ? 'rgba(239,68,68,0.14)' : rate > 1 ? 'rgba(245,158,11,0.11)' : 'transparent';
+    const color = rate > 2 ? '#f87171'              : rate > 1 ? '#fbbf24'                : '#94a3b8';
+    return { bg, color };
+  }
+
+  let html = '<table class="cwt-table"><thead><tr>';
+  html += `<th class="cwt-city" style="min-width:200px;">City / Store</th>`;
+  periods.forEach(p => { html += `<th>${periodLabel(p)}</th>`; });
+  html += '<th style="color:var(--warning);white-space:nowrap;">Overall Rate</th>';
+  html += '</tr></thead><tbody>';
+
+  cities.forEach(city => {
+    const isOpen = _storeTrendExpanded.has(city);
+    let cityIGCCAll = 0, cityOrdersAll = 0;
+    periods.forEach(p => {
+      cityIGCCAll   += pcIGCC[`${p}|${city}`] || 0;
+      cityOrdersAll += pcOrders[`${p}|${city}`] || 0;
+    });
+    const overallRate = cityOrdersAll > 0 ? (cityIGCCAll / cityOrdersAll * 100) : null;
+    const coCls = overallRate !== null ? (overallRate > 2 ? 'rate-high' : overallRate > 1 ? 'rate-med' : 'rate-low') : '';
+
+    html += `<tr class="cwt-city-hdr" onclick="storeTrendToggle('${city.replace(/'/g,"\\'")}')">`;
+    html += `<td class="cwt-city"><span class="cwt-toggle-icon">${isOpen ? '▼' : '▶'}</span> ${city}</td>`;
+    periods.forEach((p, pi) => {
+      const orders = pcOrders[`${p}|${city}`] || 0;
+      const igcc   = pcIGCC[`${p}|${city}`] || 0;
+      const rate   = orders > 0 ? (igcc / orders * 100) : null;
+      let prevRate = null;
+      if (pi > 0) {
+        const po = pcOrders[`${periods[pi-1]}|${city}`] || 0;
+        const pig = pcIGCC[`${periods[pi-1]}|${city}`] || 0;
+        prevRate = po > 0 ? (pig / po * 100) : null;
+      }
+      if (rate === null) {
+        html += `<td style="color:#3a4060;">—</td>`;
+      } else {
+        const { bg, color } = rateStyle(rate);
+        html += `<td style="background:${bg};" title="${city} ${periodLabel(p)} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate.toFixed(3)}%">
+          <div class="cwt-rate" style="color:${color};">${rate.toFixed(2)}%</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">${igcc.toLocaleString('en-IN')}${arrow(rate, prevRate)}</div>
+        </td>`;
+      }
+    });
+    html += `<td><span class="rate-badge ${coCls}">${overallRate !== null ? overallRate.toFixed(3)+'%' : '—'}</span></td>`;
+    html += `</tr>`;
+
+    if (isOpen) {
+      const storesInCity = Object.keys(storeCity).filter(sid => storeCity[sid] === city)
+        .sort((a, b) => storeTotal[b] - storeTotal[a]);
+      storesInCity.forEach(storeId => {
+        const spocTotals = storeSpocIGCC[storeId] || {};
+        const topSpoc = Object.keys(spocTotals).sort((a,b) => spocTotals[b]-spocTotals[a])[0] || '<NA>';
+        const color = SPOC_COLORS[topSpoc] || '#888';
+        const sTotalIGCC = storeTotal[storeId];
+        const share = cityIGCCAll > 0 ? (sTotalIGCC / cityIGCCAll * 100).toFixed(1) : '—';
+        let storeOrdersAll = 0;
+        periods.forEach(p => { storeOrdersAll += psOrders[`${p}|${storeId}`] || 0; });
+
+        html += `<tr class="cwt-sub-row">`;
+        html += `<td class="cwt-sub-label" title="Store ID: ${storeId}">
+          <span class="cwt-sub-dot" style="background:${color};"></span>
+          <span class="cwt-sub-name">${storeName(storeId)}</span>
+          <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
+        </td>`;
+        periods.forEach((p, pi) => {
+          const igcc = psIGCC[`${p}|${storeId}`] || 0;
+          const orders = psOrders[`${p}|${storeId}`] || 0;
+          const rate = orders > 0 ? (igcc / orders * 100) : null;
+          let prevRate = null;
+          if (pi > 0) {
+            const pi_ = psIGCC[`${periods[pi-1]}|${storeId}`] || 0;
+            const po  = psOrders[`${periods[pi-1]}|${storeId}`] || 0;
+            prevRate = po > 0 ? (pi_ / po * 100) : null;
+          }
+          if (!igcc) {
+            html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
+          } else {
+            const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+            html += `<td title="${storeName(storeId)} | ${periodLabel(p)} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
+              <div style="font-size:11px;font-weight:600;color:${color};">${igcc.toLocaleString('en-IN')}</div>
+              <div style="font-size:10px;color:var(--muted);">${rStr}${arrow(rate, prevRate)}</div>
+            </td>`;
+          }
+        });
+        const sRate = storeOrdersAll > 0 ? (sTotalIGCC / storeOrdersAll * 100) : null;
+        const sCls  = sRate !== null ? (sRate > 2 ? 'rate-high' : sRate > 1 ? 'rate-med' : 'rate-low') : '';
+        html += `<td><span class="rate-badge ${sCls}" style="font-size:10px;">${sRate !== null ? sRate.toFixed(3)+'%' : '—'}</span></td>`;
+        html += `</tr>`;
+      });
+    }
+  });
+
+  html += '</tbody><tfoot><tr>';
+  html += '<td class="cwt-city" style="color:#fff;">ALL CITIES</td>';
+  periods.forEach((p, pi) => {
+    const d = periodTotals[p] || { igcc: 0, orders: 0 };
+    const rate = d.orders > 0 ? (d.igcc / d.orders * 100) : null;
+    let prevRate = null;
+    if (pi > 0) {
+      const pd = periodTotals[periods[pi-1]] || { igcc: 0, orders: 0 };
+      prevRate = pd.orders > 0 ? (pd.igcc / pd.orders * 100) : null;
+    }
+    if (rate === null) { html += `<td>—</td>`; return; }
+    const { bg, color } = rateStyle(rate);
+    html += `<td style="background:${bg};">
+      <span class="cwt-rate" style="color:${color}">${rate.toFixed(2)}%</span>${arrow(rate, prevRate)}
+    </td>`;
+  });
+  let gIGCC = 0, gOrders = 0;
+  periods.forEach(p => { const d = periodTotals[p] || {igcc:0,orders:0}; gIGCC += d.igcc; gOrders += d.orders; });
+  const gRate = gOrders > 0 ? (gIGCC / gOrders * 100) : null;
+  const gCls  = gRate !== null ? (gRate > 2 ? 'rate-high' : gRate > 1 ? 'rate-med' : 'rate-low') : '';
+  html += `<td><span class="rate-badge ${gCls}">${gRate !== null ? gRate.toFixed(3)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('store-trend-container').innerHTML = html;
+}
+
+function downloadStoreTrendCSV() {
+  const rows = getFilteredStoreRows();
+  const isDaily = _storeTrendMode === 'daily';
+  const periodKey = isDaily ? 'date' : 'week';
+  const periods = [...new Set(rows.map(r => r[periodKey]))]
+    .sort((a, b) => isDaily ? (a < b ? -1 : a > b ? 1 : 0) : (+a - +b));
+  const periodLabel = p => isDaily ? p : `W${p}`;
+
+  const psOrders = {};
+  rows.forEach(r => {
+    const k = `${r[periodKey]}|${r.storeId}`;
+    if (!(k in psOrders)) psOrders[k] = r.orders;
+  });
+  const psIGCC = {};
+  rows.forEach(r => {
+    const k = `${r[periodKey]}|${r.storeId}`;
+    psIGCC[k] = (psIGCC[k] || 0) + r.igcc;
+  });
+
+  const storeCity = {}, storeTotal = {};
+  rows.forEach(r => {
+    storeCity[r.storeId] = r.city;
+    storeTotal[r.storeId] = (storeTotal[r.storeId] || 0) + r.igcc;
+  });
+  const storeIds = Object.keys(storeCity).sort((a,b) =>
+    storeCity[a].localeCompare(storeCity[b]) || storeTotal[b] - storeTotal[a]);
+
+  const headers = ['City', 'Store', 'Store ID',
+    ...periods.flatMap(p => [`${periodLabel(p)} IGCC`, `${periodLabel(p)} Rate%`]),
+    'Total IGCC', 'Overall Rate%'];
+
+  const csvRows = [headers];
+  storeIds.forEach(storeId => {
+    let totalOrders = 0;
+    periods.forEach(p => { totalOrders += psOrders[`${p}|${storeId}`] || 0; });
+    const totalIGCC = storeTotal[storeId];
+    const overallRate = totalOrders > 0 ? (totalIGCC / totalOrders * 100).toFixed(3) : '';
+    csvRows.push([
+      storeCity[storeId], storeName(storeId), storeId,
+      ...periods.flatMap(p => {
+        const igcc = psIGCC[`${p}|${storeId}`] || 0;
+        const orders = psOrders[`${p}|${storeId}`] || 0;
+        const rate = orders > 0 ? (igcc / orders * 100).toFixed(3) : '';
+        return [igcc, rate];
+      }),
+      totalIGCC, overallRate
+    ]);
+  });
+
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const fname = `rca_store_${_storeTrendMode}_trend.csv`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
 }
 
 // ─────────────────────────────────────────────
