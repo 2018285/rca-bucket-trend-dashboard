@@ -44,6 +44,10 @@ FILE_MAP = {
         'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv',
     'IGCC_Weekly RCA bucket sumarry_City List':
         'Weekly RCA bucket sumarry - City List.csv',
+    'IGCC_IGCC-RCA-Appsheet Summary_Store_L1_wk':
+        'IGCC-RCA-Appsheet Summary - Store_L1_wk.csv',
+    'IGCC_IGCC-RCA-Appsheet Summary_Store_L1_daily':
+        'IGCC-RCA-Appsheet Summary - Store_L1_daily.csv',
 }
 
 # ── Logging ───────────────────────────────────────────────────────────────────
