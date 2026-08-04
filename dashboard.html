@@ -418,6 +418,9 @@
       </div>
       <div class="table-toolbar-right">
         <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click city → store → SPOC to expand</span>
+        <span style="font-size:11px;color:var(--muted);">Show:</span>
+        <button class="btn btn-outline cwt-group-btn"        id="st-cell-count" onclick="storeTrendSetCellMode('count')" style="font-size:12px;padding:5px 12px;">IGCC Count</button>
+        <button class="btn btn-outline cwt-group-btn active" id="st-cell-rate"  onclick="storeTrendSetCellMode('rate')"  style="font-size:12px;padding:5px 12px;">IGCC %</button>
         <span style="font-size:11px;color:var(--muted);">View:</span>
         <button class="btn btn-outline cwt-group-btn active" id="st-mode-weekly" onclick="storeTrendSetMode('weekly')" style="font-size:12px;padding:5px 12px;">Weekly</button>
         <button class="btn btn-outline cwt-group-btn"        id="st-mode-daily"  onclick="storeTrendSetMode('daily')"  style="font-size:12px;padding:5px 12px;">Daily</button>
@@ -1877,8 +1880,17 @@ function renderCityWeekTrend(rows) {
 // STORE × WEEK/DAY TREND (Store_L1_wk / Store_L1_daily)
 // ─────────────────────────────────────────────
 let _storeTrendMode          = 'weekly';   // 'weekly' | 'daily'
+let _storeTrendCellMode      = 'rate';     // 'rate' | 'count' — which value is bold/primary in cells
 let _storeTrendExpanded      = new Set();  // set of open city names
 let _storeTrendExpandedStore = new Set();  // set of open store IDs (SPOC breakdown)
+
+function storeTrendSetCellMode(mode) {
+  if (_storeTrendCellMode === mode) return;
+  _storeTrendCellMode = mode;
+  document.getElementById('st-cell-count').classList.toggle('active', mode === 'count');
+  document.getElementById('st-cell-rate').classList.toggle('active', mode === 'rate');
+  renderStoreTrend();
+}
 
 function storeTrendSetMode(mode) {
   if (_storeTrendMode === mode) return;
@@ -2020,9 +2032,11 @@ function renderStoreTrend() {
         html += `<td style="color:#3a4060;">—</td>`;
       } else {
         const { bg, color } = rateStyle(rate);
+        const primary   = _storeTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rate.toFixed(2)+'%';
+        const secondary = _storeTrendCellMode === 'count' ? rate.toFixed(2)+'%' : igcc.toLocaleString('en-IN');
         html += `<td style="background:${bg};" title="${city} ${periodLabel(p)} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate.toFixed(3)}%">
-          <div class="cwt-rate" style="color:${color};">${rate.toFixed(2)}%</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:1px;">${igcc.toLocaleString('en-IN')}${arrow(rate, prevRate)}</div>
+          <div class="cwt-rate" style="color:${color};">${primary}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">${secondary}${arrow(rate, prevRate)}</div>
         </td>`;
       }
     });
@@ -2063,9 +2077,11 @@ function renderStoreTrend() {
             html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
           } else {
             const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+            const primary   = _storeTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+            const secondary = _storeTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
             html += `<td title="${storeName(storeId)} | ${periodLabel(p)} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
-              <div style="font-size:11px;font-weight:600;color:${color};">${igcc.toLocaleString('en-IN')}</div>
-              <div style="font-size:10px;color:var(--muted);">${rStr}${arrow(rate, prevRate)}</div>
+              <div style="font-size:11px;font-weight:600;color:${color};">${primary}</div>
+              <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
             </td>`;
           }
         });
@@ -2100,9 +2116,11 @@ function renderStoreTrend() {
                 html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
               } else {
                 const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+                const primary   = _storeTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+                const secondary = _storeTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
                 html += `<td title="${storeName(storeId)} | ${spoc} | ${periodLabel(p)} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
-                  <div style="font-size:11px;font-weight:600;color:${spocColor};">${igcc.toLocaleString('en-IN')}</div>
-                  <div style="font-size:10px;color:var(--muted);">${rStr}${arrow(rate, prevRate)}</div>
+                  <div style="font-size:11px;font-weight:600;color:${spocColor};">${primary}</div>
+                  <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
                 </td>`;
               }
             });
