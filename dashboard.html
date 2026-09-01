@@ -453,6 +453,27 @@
     </div>
   </div>
 
+  <!-- Article (Item) × Week IGCC Trend Table -->
+  <div class="table-section" style="margin-bottom:16px;">
+    <div class="table-toolbar">
+      <div class="chart-title" style="margin-bottom:0;">
+        Article × Week IGCC Rate Trend
+        <span class="badge" id="item-trend-badge">—</span>
+        <span class="duration-badge" id="item-trend-duration"></span>
+      </div>
+      <div class="table-toolbar-right">
+        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click item to expand RCA buckets</span>
+        <span style="font-size:11px;color:var(--muted);">Show:</span>
+        <button class="btn btn-outline cwt-group-btn"        id="it-cell-count" onclick="itemTrendSetCellMode('count')" style="font-size:12px;padding:5px 12px;">IGCC Count</button>
+        <button class="btn btn-outline cwt-group-btn active" id="it-cell-rate"  onclick="itemTrendSetCellMode('rate')"  style="font-size:12px;padding:5px 12px;">IGCC %</button>
+        <button class="btn btn-outline" id="download-item-trend-btn" style="font-size:12px;padding:6px 12px;">⬇ Download CSV</button>
+      </div>
+    </div>
+    <div class="table-scroll" style="max-height:520px;margin-top:12px;">
+      <div id="item-week-trend-container"></div>
+    </div>
+  </div>
+
   <!-- KPI Cards -->
   <div class="kpi-row">
     <div class="kpi-card">
@@ -947,6 +968,9 @@ async function loadData() {
   setLoadText('Loading store-wise data (Store_L1_wk / Store_L1_daily)...');
   await loadStoreTrendData();
 
+  setLoadText('Loading weekly article summary...');
+  await loadWeeklySummary();
+
   await new Promise(r => setTimeout(r, 400));
   setProgress(100);
   initApp();
@@ -1107,6 +1131,7 @@ function initApp() {
   document.getElementById('download-summary-btn').addEventListener('click', downloadSummaryCSV);
   document.getElementById('download-cwt-btn').addEventListener('click', downloadCwtCSV);
   document.getElementById('download-store-trend-btn').addEventListener('click', downloadStoreTrendCSV);
+  document.getElementById('download-item-trend-btn').addEventListener('click', downloadItemTrendCSV);
   initCharts();
   onFilterChange();
 }
@@ -1136,6 +1161,8 @@ async function refreshAllData() {
   _storeTrendMode = 'weekly';
   _storeTrendExpanded = new Set();
   _storeTrendExpandedStore = new Set();
+  _itemTrendCellMode = 'rate';
+  _itemTrendExpanded = new Set();
 
   // Destroy weekly-summary Tom Selects and reset state
   if (wsTsWeek)   { try { wsTsWeek.destroy();   } catch(e){} wsTsWeek   = null; }
@@ -1182,6 +1209,8 @@ function onFilterChange() {
   _storeTrendExpanded = new Set();
   _storeTrendExpandedStore = new Set();
   renderStoreTrend();
+  _itemTrendExpanded = new Set();
+  renderItemWeekTrend();
   renderKPIs(agg);
   updateAllCharts(agg, rows);
   renderPivotTable(rows);
@@ -1196,6 +1225,25 @@ function getFilteredStoreRows() {
     if (filterState.spocs.length   && !filterState.spocs.includes(r.spoc))  return false;
     if (q) {
       const hay = `${r.city} ${r.spoc} ${storeName(r.storeId)} ${r.storeId}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function getFilteredItemRows() {
+  const q = filterState.globalQ;
+  const wcSpocs = wsState.wcSpocs || {};
+  return wsRawRows.filter(r => {
+    if (filterState.weeks.length   && !filterState.weeks.includes(r.WEEK))   return false;
+    if (filterState.cities.length  && !filterState.cities.includes(r.CITY)) return false;
+    if (filterState.spocs.length) {
+      const spocSet = wcSpocs[`${r.WEEK}|${r.CITY}`] || new Set();
+      if (!filterState.spocs.some(s => spocSet.has(s))) return false;
+    }
+    if (filterState.buckets.length && !filterState.buckets.some(bv => r._buckets.some(b => b.bucket === bv))) return false;
+    if (q) {
+      const hay = `${r.ITEM_NAME} ${r.ITEM_CODE_NEW} ${r.CITY}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -1884,6 +1932,13 @@ let _storeTrendCellMode      = 'rate';     // 'rate' | 'count' — which value i
 let _storeTrendExpanded      = new Set();  // set of open city names
 let _storeTrendExpandedStore = new Set();  // set of open store IDs (SPOC breakdown)
 
+// ─────────────────────────────────────────────
+// ARTICLE (ITEM) × WEEK TREND (from weekly summary CSV)
+// ─────────────────────────────────────────────
+let _itemTrendCellMode = 'rate';     // 'rate' | 'count'
+let _itemTrendExpanded = new Set();  // set of open item codes (bucket breakdown)
+const ITEM_TREND_TOP_N = 40;         // cap rows shown to keep the pivot readable
+
 function storeTrendSetCellMode(mode) {
   if (_storeTrendCellMode === mode) return;
   _storeTrendCellMode = mode;
@@ -2234,6 +2289,261 @@ function downloadStoreTrendCSV() {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const fname = `rca_store_${_storeTrendMode}_trend.csv`;
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+}
+
+// ─────────────────────────────────────────────
+// ARTICLE (ITEM) × WEEK IGCC TREND (weekly summary CSV)
+// ─────────────────────────────────────────────
+function itemTrendSetCellMode(mode) {
+  if (_itemTrendCellMode === mode) return;
+  _itemTrendCellMode = mode;
+  document.getElementById('it-cell-count').classList.toggle('active', mode === 'count');
+  document.getElementById('it-cell-rate').classList.toggle('active', mode === 'rate');
+  renderItemWeekTrend();
+}
+
+function itemTrendToggle(itemCode) {
+  if (_itemTrendExpanded.has(itemCode)) _itemTrendExpanded.delete(itemCode);
+  else _itemTrendExpanded.add(itemCode);
+  renderItemWeekTrend();
+}
+
+function renderItemWeekTrend() {
+  const rows = getFilteredItemRows();
+
+  const weeks = [...new Set(rows.map(r => r.WEEK))].sort((a, b) => +a - +b);
+
+  const iwIGCC = {}, iwOrders = {}, ibwIGCC = {};
+  const itemName = {}, itemTotal = {};
+  rows.forEach(r => {
+    const item = r.ITEM_CODE_NEW;
+    if (!item) return;
+    if (!itemName[item]) itemName[item] = r.ITEM_NAME || item;
+    itemTotal[item] = (itemTotal[item] || 0) + r['Total IGCC'];
+    const kiw = `${item}|${r.WEEK}`;
+    iwIGCC[kiw]   = (iwIGCC[kiw]   || 0) + r['Total IGCC'];
+    iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    r._buckets.forEach(b => {
+      const kibw = `${item}|${r.WEEK}|${b.bucket}`;
+      ibwIGCC[kibw] = (ibwIGCC[kibw] || 0) + b.count;
+    });
+  });
+
+  const weekTotals = {};
+  rows.forEach(r => {
+    if (!weekTotals[r.WEEK]) weekTotals[r.WEEK] = { igcc: 0, orders: 0 };
+    weekTotals[r.WEEK].igcc   += r['Total IGCC'];
+    weekTotals[r.WEEK].orders += r['Unique Order Numbers'];
+  });
+
+  const allItems = Object.keys(itemTotal).sort((a, b) => itemTotal[b] - itemTotal[a]);
+  const items = allItems.slice(0, ITEM_TREND_TOP_N);
+
+  document.getElementById('item-trend-badge').textContent =
+    `${allItems.length.toLocaleString('en-IN')} items × ${weeks.length} weeks · top ${items.length} shown`;
+  setDuration('item-trend-duration', weeks);
+
+  function arrow(cur, prev) {
+    if (prev === null || cur === null) return '';
+    if (cur > prev * 1.02) return `<span class="cwt-arrow arr-up">▲</span>`;
+    if (cur < prev * 0.98) return `<span class="cwt-arrow arr-dn">▼</span>`;
+    return `<span class="cwt-arrow arr-flat">●</span>`;
+  }
+  function rateStyle(rate) {
+    const bg    = rate > 2 ? 'rgba(239,68,68,0.14)' : rate > 1 ? 'rgba(245,158,11,0.11)' : 'transparent';
+    const color = rate > 2 ? '#f87171'              : rate > 1 ? '#fbbf24'                : '#94a3b8';
+    return { bg, color };
+  }
+
+  let html = '<table class="cwt-table"><thead><tr>';
+  html += `<th class="cwt-city" style="min-width:220px;">Item / RCA Bucket</th>`;
+  weeks.forEach(w => { html += `<th>W${w}</th>`; });
+  html += '<th style="color:var(--warning);white-space:nowrap;">Overall Rate</th>';
+  html += '</tr></thead><tbody>';
+
+  items.forEach(item => {
+    const isOpen = _itemTrendExpanded.has(item);
+    let totalOrders = 0;
+    weeks.forEach(w => { totalOrders += iwOrders[`${item}|${w}`] || 0; });
+    const totalIGCC = itemTotal[item];
+    const overallRate = totalOrders > 0 ? (totalIGCC / totalOrders * 100) : null;
+    const coCls = overallRate !== null ? (overallRate > 2 ? 'rate-high' : overallRate > 1 ? 'rate-med' : 'rate-low') : '';
+
+    html += `<tr class="cwt-city-hdr" onclick="itemTrendToggle('${item.replace(/'/g,"\\'")}')">`;
+    html += `<td class="cwt-city" title="${itemName[item]} (${item})"><span class="cwt-toggle-icon">${isOpen ? '▼' : '▶'}</span> ${itemName[item]} <span style="color:var(--muted);font-weight:400;font-size:11px;">(${item})</span></td>`;
+    weeks.forEach((w, wi) => {
+      const igcc   = iwIGCC[`${item}|${w}`] || 0;
+      const orders = iwOrders[`${item}|${w}`] || 0;
+      const rate   = orders > 0 ? (igcc / orders * 100) : null;
+      let prevRate = null;
+      if (wi > 0) {
+        const po = iwOrders[`${item}|${weeks[wi-1]}`] || 0;
+        const pi = iwIGCC[`${item}|${weeks[wi-1]}`]   || 0;
+        prevRate = po > 0 ? (pi / po * 100) : null;
+      }
+      if (!igcc && rate === null) {
+        html += `<td style="color:#3a4060;">—</td>`;
+      } else {
+        const { bg, color } = rateStyle(rate || 0);
+        const rStr = rate !== null ? rate.toFixed(2)+'%' : '—';
+        const primary   = _itemTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+        const secondary = _itemTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
+        html += `<td style="background:${bg};" title="${itemName[item]} W${w} | IGCC: ${igcc.toLocaleString('en-IN')} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
+          <div class="cwt-rate" style="color:${color};">${primary}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1px;">${secondary}${arrow(rate, prevRate)}</div>
+        </td>`;
+      }
+    });
+    html += `<td><span class="rate-badge ${coCls}">${overallRate !== null ? overallRate.toFixed(3)+'%' : '—'}</span></td>`;
+    html += `</tr>`;
+
+    if (isOpen) {
+      const bucketTotal = {};
+      weeks.forEach(w => {
+        Object.keys(ibwIGCC).forEach(k => {
+          if (k.startsWith(`${item}|${w}|`)) {
+            const bucket = k.slice(`${item}|${w}|`.length);
+            bucketTotal[bucket] = (bucketTotal[bucket] || 0) + ibwIGCC[k];
+          }
+        });
+      });
+      const buckets = Object.keys(bucketTotal).sort((a, b) => bucketTotal[b] - bucketTotal[a]);
+      buckets.forEach(bucket => {
+        const color = BUCKET_COLORS[bucket] || '#888';
+        const bTotalIGCC = bucketTotal[bucket];
+        const share = totalIGCC > 0 ? (bTotalIGCC / totalIGCC * 100).toFixed(1) : '—';
+
+        html += `<tr class="cwt-sub-row" style="background:rgba(255,255,255,0.015);">`;
+        html += `<td class="cwt-sub-label">
+          <span class="cwt-sub-dot" style="background:${color};"></span>
+          <span class="cwt-sub-name">${bucket}</span>
+          <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
+        </td>`;
+        weeks.forEach((w, wi) => {
+          const igcc   = ibwIGCC[`${item}|${w}|${bucket}`] || 0;
+          const orders = iwOrders[`${item}|${w}`] || 0;
+          const rate   = orders > 0 ? (igcc / orders * 100) : null;
+          let prevRate = null;
+          if (wi > 0) {
+            const pig = ibwIGCC[`${item}|${weeks[wi-1]}|${bucket}`] || 0;
+            const po  = iwOrders[`${item}|${weeks[wi-1]}`] || 0;
+            prevRate = po > 0 ? (pig / po * 100) : null;
+          }
+          if (!igcc) {
+            html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
+          } else {
+            const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+            const primary   = _itemTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+            const secondary = _itemTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
+            html += `<td title="${bucket} | W${w} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
+              <div style="font-size:11px;font-weight:600;color:${color};">${primary}</div>
+              <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
+            </td>`;
+          }
+        });
+        const bRate = totalOrders > 0 ? (bTotalIGCC / totalOrders * 100) : null;
+        const bCls  = bRate !== null ? (bRate > 2 ? 'rate-high' : bRate > 1 ? 'rate-med' : 'rate-low') : '';
+        html += `<td><span class="rate-badge ${bCls}" style="font-size:10px;">${bRate !== null ? bRate.toFixed(3)+'%' : '—'}</span></td>`;
+        html += `</tr>`;
+      });
+    }
+  });
+
+  html += '</tbody><tfoot><tr>';
+  html += '<td class="cwt-city" style="color:#fff;">ALL ITEMS (filtered)</td>';
+  weeks.forEach((w, wi) => {
+    const d = weekTotals[w] || { igcc: 0, orders: 0 };
+    const rate = d.orders > 0 ? (d.igcc / d.orders * 100) : null;
+    let prevRate = null;
+    if (wi > 0) {
+      const pd = weekTotals[weeks[wi-1]] || { igcc: 0, orders: 0 };
+      prevRate = pd.orders > 0 ? (pd.igcc / pd.orders * 100) : null;
+    }
+    if (rate === null) { html += `<td>—</td>`; return; }
+    const { bg, color } = rateStyle(rate);
+    html += `<td style="background:${bg};">
+      <span class="cwt-rate" style="color:${color}">${rate.toFixed(2)}%</span>${arrow(rate, prevRate)}
+    </td>`;
+  });
+  let gIGCC = 0, gOrders = 0;
+  weeks.forEach(w => { const d = weekTotals[w] || {igcc:0,orders:0}; gIGCC += d.igcc; gOrders += d.orders; });
+  const gRate = gOrders > 0 ? (gIGCC / gOrders * 100) : null;
+  const gCls  = gRate !== null ? (gRate > 2 ? 'rate-high' : gRate > 1 ? 'rate-med' : 'rate-low') : '';
+  html += `<td><span class="rate-badge ${gCls}">${gRate !== null ? gRate.toFixed(3)+'%' : '—'}</span></td>`;
+  html += '</tr></tfoot></table>';
+
+  document.getElementById('item-week-trend-container').innerHTML = html;
+}
+
+function downloadItemTrendCSV() {
+  const rows = getFilteredItemRows();
+  const weeks = [...new Set(rows.map(r => r.WEEK))].sort((a, b) => +a - +b);
+
+  const iwIGCC = {}, iwOrders = {}, ibwIGCC = {};
+  const itemName = {}, itemTotal = {};
+  rows.forEach(r => {
+    const item = r.ITEM_CODE_NEW;
+    if (!item) return;
+    if (!itemName[item]) itemName[item] = r.ITEM_NAME || item;
+    itemTotal[item] = (itemTotal[item] || 0) + r['Total IGCC'];
+    const kiw = `${item}|${r.WEEK}`;
+    iwIGCC[kiw]   = (iwIGCC[kiw]   || 0) + r['Total IGCC'];
+    iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    r._buckets.forEach(b => {
+      const kibw = `${item}|${r.WEEK}|${b.bucket}`;
+      ibwIGCC[kibw] = (ibwIGCC[kibw] || 0) + b.count;
+    });
+  });
+
+  const items = Object.keys(itemTotal).sort((a, b) => itemTotal[b] - itemTotal[a]);
+  const headers = ['Item Code', 'Item Name', 'RCA Bucket',
+    ...weeks.flatMap(w => [`W${w} IGCC`, `W${w} Rate%`]),
+    'Total IGCC', 'Overall Rate%'];
+
+  const csvRows = [headers];
+  items.forEach(item => {
+    let totalOrders = 0;
+    weeks.forEach(w => { totalOrders += iwOrders[`${item}|${w}`] || 0; });
+    const totalIGCC = itemTotal[item];
+    const overallRate = totalOrders > 0 ? (totalIGCC / totalOrders * 100).toFixed(3) : '';
+    csvRows.push([
+      item, itemName[item], 'ALL',
+      ...weeks.flatMap(w => {
+        const igcc = iwIGCC[`${item}|${w}`] || 0;
+        const orders = iwOrders[`${item}|${w}`] || 0;
+        const rate = orders > 0 ? (igcc / orders * 100).toFixed(3) : '';
+        return [igcc, rate];
+      }),
+      totalIGCC, overallRate
+    ]);
+
+    const bucketTotal = {};
+    weeks.forEach(w => {
+      Object.keys(ibwIGCC).forEach(k => {
+        if (k.startsWith(`${item}|${w}|`)) {
+          const bucket = k.slice(`${item}|${w}|`.length);
+          bucketTotal[bucket] = (bucketTotal[bucket] || 0) + ibwIGCC[k];
+        }
+      });
+    });
+    Object.keys(bucketTotal).sort((a,b) => bucketTotal[b]-bucketTotal[a]).forEach(bucket => {
+      const bTotalIGCC = bucketTotal[bucket];
+      const bRate = totalOrders > 0 ? (bTotalIGCC / totalOrders * 100).toFixed(3) : '';
+      csvRows.push([
+        item, itemName[item], bucket,
+        ...weeks.flatMap(w => {
+          const igcc = ibwIGCC[`${item}|${w}|${bucket}`] || 0;
+          const rate = totalOrders > 0 ? (igcc / (iwOrders[`${item}|${w}`] || 0) * 100) : NaN;
+          return [igcc, isFinite(rate) ? rate.toFixed(3) : ''];
+        }),
+        bTotalIGCC, bRate
+      ]);
+    });
+  });
+
+  const csv = Papa.unparse(csvRows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rca_item_week_trend.csv'; a.click();
 }
 
 // ─────────────────────────────────────────────
