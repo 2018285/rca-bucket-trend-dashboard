@@ -341,7 +341,7 @@
   <!-- Global search + active filter chips -->
   <div class="global-bar">
     <div class="global-search-wrap">
-      <input type="text" id="global-search" placeholder="Search city, bucket, SPOC…">
+      <input type="text" id="global-search" placeholder="Search city, bucket, SPOC, article…">
     </div>
     <div class="active-filter-chips" id="active-filter-chips">
       <span class="active-chips-label" id="chips-label" style="display:none;">Active filters:</span>
@@ -370,6 +370,14 @@
     <div class="filter-group wide">
       <label>RCA Bucket</label>
       <select id="filter-bucket" multiple placeholder="All Buckets"></select>
+    </div>
+    <div class="filter-group wide">
+      <label>Article Code</label>
+      <select id="filter-item-code" multiple placeholder="All Article Codes"></select>
+    </div>
+    <div class="filter-group wide">
+      <label>Article Name</label>
+      <select id="filter-item-name" multiple placeholder="All Article Names"></select>
     </div>
   </div>
 
@@ -462,7 +470,10 @@
         <span class="duration-badge" id="item-trend-duration"></span>
       </div>
       <div class="table-toolbar-right">
-        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click item to expand RCA buckets</span>
+        <span style="font-size:11px;color:var(--muted);">▲ rising &nbsp; ▼ falling &nbsp; ● stable &nbsp;|&nbsp; click item to expand breakdown</span>
+        <span style="font-size:11px;color:var(--muted);">Group by:</span>
+        <button class="btn btn-outline cwt-group-btn it-group-btn active" id="it-grp-bucket" onclick="itemTrendSetGroup('bucket')" style="font-size:12px;padding:5px 12px;">RCA Bucket</button>
+        <button class="btn btn-outline cwt-group-btn it-group-btn"        id="it-grp-spoc"   onclick="itemTrendSetGroup('spoc')"   style="font-size:12px;padding:5px 12px;" title="Estimated: distributes each article's bucket IGCC using that city+week+bucket's real SPOC split from City × Week data">SPOC (est.)</button>
         <span style="font-size:11px;color:var(--muted);">Show:</span>
         <button class="btn btn-outline cwt-group-btn"        id="it-cell-count" onclick="itemTrendSetCellMode('count')" style="font-size:12px;padding:5px 12px;">IGCC Count</button>
         <button class="btn btn-outline cwt-group-btn active" id="it-cell-rate"  onclick="itemTrendSetCellMode('rate')"  style="font-size:12px;padding:5px 12px;">IGCC %</button>
@@ -863,7 +874,7 @@ function selectTier(tier) {
   onFilterChange();
 }
 
-let filterState = { weeks: [], cities: [], spocs: [], buckets: [], globalQ: '' };
+let filterState = { weeks: [], cities: [], spocs: [], buckets: [], itemCodes: [], itemNames: [], globalQ: '' };
 let charts = {};
 let tableState = { sortCol: 'igcc', sortDir: 'desc', page: 0 };
 const PAGE_SIZE = 100;
@@ -873,7 +884,7 @@ let itemState = { sortCol: 'IGCC', sortDir: 'desc', page: 0, filtered: [], inite
 const ITEM_PAGE_SIZE = 100;
 
 // Tom Select instances
-let tsWeek, tsCity, tsSpoc, tsBucket;
+let tsWeek, tsCity, tsSpoc, tsBucket, tsItemCode, tsItemName;
 
 // ─────────────────────────────────────────────
 // LOADING
@@ -1105,6 +1116,25 @@ function initApp() {
     onChange: onFilterChange
   });
 
+  // Tom Select – Article Code / Article Name (from weekly article summary)
+  const allItemCodes = [...new Set(wsRawRows.map(r => r.ITEM_CODE_NEW))].filter(Boolean).sort();
+  const itemNameByCode = {};
+  wsRawRows.forEach(r => { if (r.ITEM_CODE_NEW && !itemNameByCode[r.ITEM_CODE_NEW]) itemNameByCode[r.ITEM_CODE_NEW] = r.ITEM_NAME; });
+  const allItemNames = [...new Set(wsRawRows.map(r => r.ITEM_NAME))].filter(Boolean).sort();
+
+  tsItemCode = new TomSelect('#filter-item-code', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allItemCodes.map(c => ({ value: c, text: itemNameByCode[c] ? `${c} — ${itemNameByCode[c]}` : c })),
+    maxItems: null,
+    onChange: onFilterChange
+  });
+  tsItemName = new TomSelect('#filter-item-name', {
+    plugins: ['remove_button', 'clear_button'],
+    options: allItemNames.map(n => ({ value: n, text: n })),
+    maxItems: null,
+    onChange: onFilterChange
+  });
+
   // Global search input
   const gsEl = document.getElementById('global-search');
   if (gsEl) {
@@ -1118,6 +1148,8 @@ function initApp() {
     tsCity.clear(true);
     tsSpoc.clear(true);
     tsBucket.clear(true);
+    tsItemCode.clear(true);
+    tsItemName.clear(true);
     document.getElementById('tier1-btn').classList.remove('active');
     document.getElementById('tier2-btn').classList.remove('active');
     const gs = document.getElementById('global-search');
@@ -1150,6 +1182,8 @@ async function refreshAllData() {
   if (tsCity)   { try { tsCity.destroy();   } catch(e){} tsCity   = null; }
   if (tsSpoc)   { try { tsSpoc.destroy();   } catch(e){} tsSpoc   = null; }
   if (tsBucket) { try { tsBucket.destroy(); } catch(e){} tsBucket = null; }
+  if (tsItemCode) { try { tsItemCode.destroy(); } catch(e){} tsItemCode = null; }
+  if (tsItemName) { try { tsItemName.destroy(); } catch(e){} tsItemName = null; }
 
   // Reset data arrays
   aggregatedCube = [];
@@ -1162,7 +1196,9 @@ async function refreshAllData() {
   _storeTrendExpanded = new Set();
   _storeTrendExpandedStore = new Set();
   _itemTrendCellMode = 'rate';
+  _itemTrendGroupBy  = 'bucket';
   _itemTrendExpanded = new Set();
+  _lastItemTrendCubeRows = [];
 
   // Destroy weekly-summary Tom Selects and reset state
   if (wsTsWeek)   { try { wsTsWeek.destroy();   } catch(e){} wsTsWeek   = null; }
@@ -1199,6 +1235,8 @@ function onFilterChange() {
   filterState.cities  = tsCity   ? tsCity.getValue()   : [];
   filterState.spocs   = tsSpoc   ? tsSpoc.getValue()   : [];
   filterState.buckets = tsBucket ? tsBucket.getValue() : [];
+  filterState.itemCodes = tsItemCode ? tsItemCode.getValue() : [];
+  filterState.itemNames = tsItemName ? tsItemName.getValue() : [];
   filterState.globalQ = (document.getElementById('global-search')?.value || '').toLowerCase().trim();
   updateActiveChips();
   const rows = getFilteredRows();
@@ -1210,7 +1248,7 @@ function onFilterChange() {
   _storeTrendExpandedStore = new Set();
   renderStoreTrend();
   _itemTrendExpanded = new Set();
-  renderItemWeekTrend();
+  renderItemWeekTrend(rows);
   renderKPIs(agg);
   updateAllCharts(agg, rows);
   renderPivotTable(rows);
@@ -1242,6 +1280,8 @@ function getFilteredItemRows() {
       if (!filterState.spocs.some(s => spocSet.has(s))) return false;
     }
     if (filterState.buckets.length && !filterState.buckets.some(bv => r._buckets.some(b => b.bucket === bv))) return false;
+    if (filterState.itemCodes.length && !filterState.itemCodes.includes(r.ITEM_CODE_NEW)) return false;
+    if (filterState.itemNames.length && !filterState.itemNames.includes(r.ITEM_NAME)) return false;
     if (q) {
       const hay = `${r.ITEM_NAME} ${r.ITEM_CODE_NEW} ${r.CITY}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -1259,6 +1299,8 @@ function updateActiveChips() {
   filterState.cities.forEach(c  => add('city',   c,            c,  tsCity));
   filterState.spocs.forEach(s   => add('spoc',   s,            s,  tsSpoc));
   filterState.buckets.forEach(b => add('bucket', b,            b,  tsBucket));
+  filterState.itemCodes.forEach(c => add('article', c,          c,  tsItemCode));
+  filterState.itemNames.forEach(n => add('article', n,          n,  tsItemName));
   if (filterState.globalQ)        add('search',  `"${filterState.globalQ}"`, null, null);
 
   // Remove old chips (keep label)
@@ -1936,7 +1978,9 @@ let _storeTrendExpandedStore = new Set();  // set of open store IDs (SPOC breakd
 // ARTICLE (ITEM) × WEEK TREND (from weekly summary CSV)
 // ─────────────────────────────────────────────
 let _itemTrendCellMode = 'rate';     // 'rate' | 'count'
-let _itemTrendExpanded = new Set();  // set of open item codes (bucket breakdown)
+let _itemTrendGroupBy  = 'bucket';   // 'bucket' | 'spoc' (spoc is an estimate — see itemTrendSpocShare)
+let _itemTrendExpanded = new Set();  // set of open item codes (bucket/spoc breakdown)
+let _lastItemTrendCubeRows = [];     // last filtered aggregatedCube rows, used to estimate item×SPOC split
 const ITEM_TREND_TOP_N = 40;         // cap rows shown to keep the pivot readable
 
 function storeTrendSetCellMode(mode) {
@@ -2302,18 +2346,53 @@ function itemTrendSetCellMode(mode) {
   renderItemWeekTrend();
 }
 
+function itemTrendSetGroup(mode) {
+  if (_itemTrendGroupBy === mode) return;
+  _itemTrendGroupBy  = mode;
+  _itemTrendExpanded = new Set();
+  document.querySelectorAll('.it-group-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('it-grp-' + mode).classList.add('active');
+  renderItemWeekTrend();
+}
+
+// Estimates, for a given week+city+bucket, how that bucket's IGCC splits across SPOCs —
+// derived from aggregatedCube's real city+week+bucket+spoc granularity (City × Week source data).
+// The weekly article CSV has no SPOC field of its own, so this is a proportional estimate,
+// not a direct measurement — surfaced in the UI as "SPOC (est.)".
+function itemTrendSpocShareMap(cubeRows) {
+  const wcbSpocIGCC = {};
+  (cubeRows || []).forEach(r => {
+    const k = `${r.week}|${r.city}|${r.bucket}`;
+    if (!wcbSpocIGCC[k]) wcbSpocIGCC[k] = {};
+    wcbSpocIGCC[k][r.spoc] = (wcbSpocIGCC[k][r.spoc] || 0) + r.igcc;
+  });
+  return wcbSpocIGCC;
+}
+
 function itemTrendToggle(itemCode) {
   if (_itemTrendExpanded.has(itemCode)) _itemTrendExpanded.delete(itemCode);
   else _itemTrendExpanded.add(itemCode);
   renderItemWeekTrend();
 }
 
-function renderItemWeekTrend() {
+function renderItemWeekTrend(cubeRows) {
+  if (cubeRows) _lastItemTrendCubeRows = cubeRows;
   const rows = getFilteredItemRows();
 
   const weeks = [...new Set(rows.map(r => r.WEEK))].sort((a, b) => +a - +b);
 
-  const iwIGCC = {}, iwOrders = {}, ibwIGCC = {};
+  const wcbSpocIGCC = _itemTrendGroupBy === 'spoc' ? itemTrendSpocShareMap(_lastItemTrendCubeRows) : {};
+  function spocSharesFor(week, city, bucket) {
+    const m = wcbSpocIGCC[`${week}|${city}|${bucket}`];
+    if (!m) return null;
+    const total = Object.values(m).reduce((a, b) => a + b, 0);
+    if (!total) return null;
+    const shares = {};
+    Object.keys(m).forEach(s => { shares[s] = m[s] / total; });
+    return shares;
+  }
+
+  const iwIGCC = {}, iwOrders = {}, ibwIGCC = {}, iwsIGCC = {};
   const itemName = {}, itemTotal = {};
   rows.forEach(r => {
     const item = r.ITEM_CODE_NEW;
@@ -2326,6 +2405,15 @@ function renderItemWeekTrend() {
     r._buckets.forEach(b => {
       const kibw = `${item}|${r.WEEK}|${b.bucket}`;
       ibwIGCC[kibw] = (ibwIGCC[kibw] || 0) + b.count;
+      if (_itemTrendGroupBy === 'spoc') {
+        const shares = spocSharesFor(r.WEEK, r.CITY, b.bucket);
+        if (shares) {
+          Object.keys(shares).forEach(spoc => {
+            const kiws = `${item}|${r.WEEK}|${spoc}`;
+            iwsIGCC[kiws] = (iwsIGCC[kiws] || 0) + b.count * shares[spoc];
+          });
+        }
+      }
     });
   });
 
@@ -2340,7 +2428,7 @@ function renderItemWeekTrend() {
   const items = allItems.slice(0, ITEM_TREND_TOP_N);
 
   document.getElementById('item-trend-badge').textContent =
-    `${allItems.length.toLocaleString('en-IN')} items × ${weeks.length} weeks · top ${items.length} shown`;
+    `${allItems.length.toLocaleString('en-IN')} items × ${weeks.length} weeks · top ${items.length} shown · grouped by ${_itemTrendGroupBy === 'spoc' ? 'SPOC (est.)' : 'RCA Bucket'}`;
   setDuration('item-trend-duration', weeks);
 
   function arrow(cur, prev) {
@@ -2356,7 +2444,7 @@ function renderItemWeekTrend() {
   }
 
   let html = '<table class="cwt-table"><thead><tr>';
-  html += `<th class="cwt-city" style="min-width:220px;">Item / RCA Bucket</th>`;
+  html += `<th class="cwt-city" style="min-width:220px;">Item / ${_itemTrendGroupBy === 'spoc' ? 'SPOC (est.)' : 'RCA Bucket'}</th>`;
   weeks.forEach(w => { html += `<th>W${w}</th>`; });
   html += '<th style="color:var(--warning);white-space:nowrap;">Overall Rate</th>';
   html += '</tr></thead><tbody>';
@@ -2398,54 +2486,108 @@ function renderItemWeekTrend() {
     html += `</tr>`;
 
     if (isOpen) {
-      const bucketTotal = {};
-      weeks.forEach(w => {
-        Object.keys(ibwIGCC).forEach(k => {
-          if (k.startsWith(`${item}|${w}|`)) {
-            const bucket = k.slice(`${item}|${w}|`.length);
-            bucketTotal[bucket] = (bucketTotal[bucket] || 0) + ibwIGCC[k];
-          }
+      if (_itemTrendGroupBy === 'bucket') {
+        const bucketTotal = {};
+        weeks.forEach(w => {
+          Object.keys(ibwIGCC).forEach(k => {
+            if (k.startsWith(`${item}|${w}|`)) {
+              const bucket = k.slice(`${item}|${w}|`.length);
+              bucketTotal[bucket] = (bucketTotal[bucket] || 0) + ibwIGCC[k];
+            }
+          });
         });
-      });
-      const buckets = Object.keys(bucketTotal).sort((a, b) => bucketTotal[b] - bucketTotal[a]);
-      buckets.forEach(bucket => {
-        const color = BUCKET_COLORS[bucket] || '#888';
-        const bTotalIGCC = bucketTotal[bucket];
-        const share = totalIGCC > 0 ? (bTotalIGCC / totalIGCC * 100).toFixed(1) : '—';
+        const buckets = Object.keys(bucketTotal).sort((a, b) => bucketTotal[b] - bucketTotal[a]);
+        buckets.forEach(bucket => {
+          const color = BUCKET_COLORS[bucket] || '#888';
+          const bTotalIGCC = bucketTotal[bucket];
+          const share = totalIGCC > 0 ? (bTotalIGCC / totalIGCC * 100).toFixed(1) : '—';
 
-        html += `<tr class="cwt-sub-row" style="background:rgba(255,255,255,0.015);">`;
-        html += `<td class="cwt-sub-label">
-          <span class="cwt-sub-dot" style="background:${color};"></span>
-          <span class="cwt-sub-name">${bucket}</span>
-          <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
-        </td>`;
-        weeks.forEach((w, wi) => {
-          const igcc   = ibwIGCC[`${item}|${w}|${bucket}`] || 0;
-          const orders = iwOrders[`${item}|${w}`] || 0;
-          const rate   = orders > 0 ? (igcc / orders * 100) : null;
-          let prevRate = null;
-          if (wi > 0) {
-            const pig = ibwIGCC[`${item}|${weeks[wi-1]}|${bucket}`] || 0;
-            const po  = iwOrders[`${item}|${weeks[wi-1]}`] || 0;
-            prevRate = po > 0 ? (pig / po * 100) : null;
-          }
-          if (!igcc) {
-            html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
-          } else {
-            const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
-            const primary   = _itemTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
-            const secondary = _itemTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
-            html += `<td title="${bucket} | W${w} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
-              <div style="font-size:11px;font-weight:600;color:${color};">${primary}</div>
-              <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
-            </td>`;
-          }
+          html += `<tr class="cwt-sub-row" style="background:rgba(255,255,255,0.015);">`;
+          html += `<td class="cwt-sub-label">
+            <span class="cwt-sub-dot" style="background:${color};"></span>
+            <span class="cwt-sub-name">${bucket}</span>
+            <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
+          </td>`;
+          weeks.forEach((w, wi) => {
+            const igcc   = ibwIGCC[`${item}|${w}|${bucket}`] || 0;
+            const orders = iwOrders[`${item}|${w}`] || 0;
+            const rate   = orders > 0 ? (igcc / orders * 100) : null;
+            let prevRate = null;
+            if (wi > 0) {
+              const pig = ibwIGCC[`${item}|${weeks[wi-1]}|${bucket}`] || 0;
+              const po  = iwOrders[`${item}|${weeks[wi-1]}`] || 0;
+              prevRate = po > 0 ? (pig / po * 100) : null;
+            }
+            if (!igcc) {
+              html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
+            } else {
+              const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+              const primary   = _itemTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+              const secondary = _itemTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
+              html += `<td title="${bucket} | W${w} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
+                <div style="font-size:11px;font-weight:600;color:${color};">${primary}</div>
+                <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
+              </td>`;
+            }
+          });
+          const bRate = totalOrders > 0 ? (bTotalIGCC / totalOrders * 100) : null;
+          const bCls  = bRate !== null ? (bRate > 2 ? 'rate-high' : bRate > 1 ? 'rate-med' : 'rate-low') : '';
+          html += `<td><span class="rate-badge ${bCls}" style="font-size:10px;">${bRate !== null ? bRate.toFixed(3)+'%' : '—'}</span></td>`;
+          html += `</tr>`;
         });
-        const bRate = totalOrders > 0 ? (bTotalIGCC / totalOrders * 100) : null;
-        const bCls  = bRate !== null ? (bRate > 2 ? 'rate-high' : bRate > 1 ? 'rate-med' : 'rate-low') : '';
-        html += `<td><span class="rate-badge ${bCls}" style="font-size:10px;">${bRate !== null ? bRate.toFixed(3)+'%' : '—'}</span></td>`;
-        html += `</tr>`;
-      });
+      } else {
+        const spocTotal = {};
+        weeks.forEach(w => {
+          Object.keys(iwsIGCC).forEach(k => {
+            if (k.startsWith(`${item}|${w}|`)) {
+              const spoc = k.slice(`${item}|${w}|`.length);
+              spocTotal[spoc] = (spocTotal[spoc] || 0) + iwsIGCC[k];
+            }
+          });
+        });
+        const spocs = Object.keys(spocTotal).sort((a, b) => spocTotal[b] - spocTotal[a]);
+        if (!spocs.length) {
+          html += `<tr class="cwt-sub-row" style="background:rgba(255,255,255,0.015);"><td class="cwt-sub-label" style="color:var(--muted);font-size:11px;" colspan="${weeks.length + 2}">No SPOC estimate available — this item's city+week+bucket combo has no matching City × Week SPOC data.</td></tr>`;
+        }
+        spocs.forEach(spoc => {
+          const color = SPOC_COLORS[spoc] || '#888';
+          const sTotalIGCC = spocTotal[spoc];
+          const share = totalIGCC > 0 ? (sTotalIGCC / totalIGCC * 100).toFixed(1) : '—';
+
+          html += `<tr class="cwt-sub-row" style="background:rgba(255,255,255,0.015);">`;
+          html += `<td class="cwt-sub-label" title="Estimated — proportionally split from this item's bucket IGCC using City × Week SPOC shares">
+            <span class="cwt-sub-dot" style="background:${color};"></span>
+            <span class="cwt-sub-name">${spoc}</span>
+            <div class="cwt-share-bar-wrap"><div class="cwt-share-bar" style="width:${share}%;background:${color}40;border-left:3px solid ${color};"></div><span class="cwt-share-pct">${share}%</span></div>
+          </td>`;
+          weeks.forEach((w, wi) => {
+            const igcc   = Math.round(iwsIGCC[`${item}|${w}|${spoc}`] || 0);
+            const orders = iwOrders[`${item}|${w}`] || 0;
+            const rate   = orders > 0 ? (igcc / orders * 100) : null;
+            let prevRate = null;
+            if (wi > 0) {
+              const pig = iwsIGCC[`${item}|${weeks[wi-1]}|${spoc}`] || 0;
+              const po  = iwOrders[`${item}|${weeks[wi-1]}`] || 0;
+              prevRate = po > 0 ? (pig / po * 100) : null;
+            }
+            if (!igcc) {
+              html += `<td style="color:#3a4060;font-size:11px;">—</td>`;
+            } else {
+              const rStr = rate !== null ? rate.toFixed(2)+'%' : '';
+              const primary   = _itemTrendCellMode === 'count' ? igcc.toLocaleString('en-IN') : rStr;
+              const secondary = _itemTrendCellMode === 'count' ? rStr : igcc.toLocaleString('en-IN');
+              html += `<td title="${spoc} (est.) | W${w} | IGCC: ${igcc} | Rate: ${rate !== null ? rate.toFixed(3)+'%' : '?'}">
+                <div style="font-size:11px;font-weight:600;color:${color};">${primary}</div>
+                <div style="font-size:10px;color:var(--muted);">${secondary}${arrow(rate, prevRate)}</div>
+              </td>`;
+            }
+          });
+          const sRate = totalOrders > 0 ? (sTotalIGCC / totalOrders * 100) : null;
+          const sCls  = sRate !== null ? (sRate > 2 ? 'rate-high' : sRate > 1 ? 'rate-med' : 'rate-low') : '';
+          html += `<td><span class="rate-badge ${sCls}" style="font-size:10px;">${sRate !== null ? sRate.toFixed(3)+'%' : '—'}</span></td>`;
+          html += `</tr>`;
+        });
+      }
     }
   });
 
