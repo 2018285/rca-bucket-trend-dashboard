@@ -1,0 +1,245 @@
+function copyweeklyrca() {,,Current script
+"const sourceSpreadsheetId = ""1k-aIC3c-0MG0ztAFk3jAq1p13JzWdjPCSYDWRDspNDY"";",,function finalIGCCDailyRCASummary() {
+"const sourceSheetName = ""Item_level_weekly"";",,const ss = SpreadsheetApp.getActiveSpreadsheet();
+"const targetSpreadsheetId = ""1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk"";",,"const sourceSheet = ss.getSheetByName(""Daily-RCA bucket"");"
+"const targetSheetName = ""RCA weekly bucket"";",,"const outputSheetName = ""Daily-RCA-Summary"";"
+const numCols = 10;,,let outputSheet = ss.getSheetByName(outputSheetName);
+,,
+const sourceSS = SpreadsheetApp.openById(sourceSpreadsheetId);,,// --- STEP 1: AGGRESSIVE CELL RECOVERY ---
+const sourceSheet = sourceSS.getSheetByName(sourceSheetName);,,if (outputSheet) {
+"if (!sourceSheet) throw new Error(`Source sheet ""${sourceSheetName}"" not found.`);",,outputSheet.clear();
+,,const currentMaxRows = outputSheet.getMaxRows();
+const targetSS = SpreadsheetApp.openById(targetSpreadsheetId);,,const currentMaxCols = outputSheet.getMaxColumns();
+let targetSheet = targetSS.getSheetByName(targetSheetName);,,"if (currentMaxRows > 1) outputSheet.deleteRows(1, currentMaxRows - 1);"
+if (!targetSheet) targetSheet = targetSS.insertSheet(targetSheetName);,,"if (currentMaxCols > 1) outputSheet.deleteColumns(1, currentMaxCols - 1);"
+,,} else {
+const lastRow = sourceSheet.getLastRow();,,outputSheet = ss.insertSheet(outputSheetName);
+"if (!lastRow || lastRow < 1) { Logger.log(""No data.""); return; }",,}
+,,
+"const data = sourceSheet.getRange(1, 1, lastRow, numCols).getValues();",,// --- STEP 2: DATA PROCESSING ---
+targetSheet.clearContents();,,const data = sourceSheet.getDataRange().getValues();
+"targetSheet.getRange(1, 1, data.length, data[0].length).setValues(data);",,if (data.length < 2) return;
+"Logger.log(`✅ copyweeklyrca: Copied ${data.length - 1} rows to ""${targetSheetName}""`);",,
+},,const headers = data[0];
+,,const colIndex = {};
+function finalIGCCweeklyRCASummary() {,,"headers.forEach((h, i) => colIndex[h.trim()] = i);"
+const ss = SpreadsheetApp.getActiveSpreadsheet();,,
+"const sourceSheet = ss.getSheetByName(""RCA weekly bucket"");",,const getCol = (name) => colIndex[name] !== undefined ? colIndex[name] : -1;
+"const outputSheetName = ""WeeklyRCA-Summary"";",,const result = {};
+let outputSheet = ss.getSheetByName(outputSheetName);,,
+,,for (let i = 1; i < data.length; i++) {
+// --- STEP 1: AGGRESSIVE CELL RECOVERY ---,,const row = data[i];
+if (outputSheet) {,,// --- DAILY CHANGE: Track Date (DT) ---
+outputSheet.clear();,,"let dtRaw = row[getCol(""DT"")];"
+const currentMaxRows = outputSheet.getMaxRows();,,if (!dtRaw) continue;
+const currentMaxCols = outputSheet.getMaxColumns();,,// Format date consistently if it's a standard Date Object
+"if (currentMaxRows > 1) outputSheet.deleteRows(1, currentMaxRows - 1);",,"const dt = dtRaw instanceof Date ? Utilities.formatDate(dtRaw, ss.getSpreadsheetTimeZone(), ""M/d/yyyy"") : String(dtRaw).trim();"
+"if (currentMaxCols > 1) outputSheet.deleteColumns(1, currentMaxCols - 1);",,"const week = row[getCol(""WEEK"")];"
+} else {,,"const city = row[getCol(""CITY"")];"
+outputSheet = ss.insertSheet(outputSheetName);,,"const itemCode = row[getCol(""ITEM_CODE_NEW"")];"
+},,"const itemName = row[getCol(""ITEM_NAME"")];"
+,,"const igcc = Number(row[getCol(""IGCC"")]) || 0;"
+// --- STEP 2: DATA PROCESSING ---,,"const reason = String(row[getCol(""Basic Reason for IGCC"")] || ""Unknown"").trim();"
+const data = sourceSheet.getDataRange().getValues();,,"let orderRaw = String(row[getCol(""ORDERS"")] || """").trim();"
+if (data.length < 2) return;,,"let ordersArray = orderRaw.split("","").map(o => o.trim().replace("".0"", """"));"
+,,
+const headers = data[0];,,// --- DAILY CHANGE: Key includes Date (DT) instead of Week ---
+const colIndex = {};,,const key = `${dt}|${week}|${city}|${itemCode}|${itemName}`;
+"headers.forEach((h, i) => colIndex[h.trim()] = i);",,
+,,if (!result[key]) {
+const getCol = (name) => colIndex[name] !== undefined ? colIndex[name] : -1;,,"result[key] = { dt, week, city, itemCode, itemName, igccSum: 0, ordersSet: new Set(), reasons: {} };"
+const result = {};,,}
+,,
+for (let i = 1; i < data.length; i++) {,,result[key].igccSum += igcc;
+const row = data[i];,,result[key].reasons[reason] = (result[key].reasons[reason] || 0) + igcc;
+"const week = row[getCol(""WEEK"")];",,
+if (!week && week !== 0) continue;,,ordersArray.forEach(order => {
+,,"if (order !== """" && order !== ""null"") result[key].ordersSet.add(order);"
+"const city = row[getCol(""CITY"")];",,});
+"const itemCode = row[getCol(""ITEM_CODE_NEW"")];",,}
+"const itemName = row[getCol(""ITEM_NAME"")];",,
+// Ensure IGCC is treated as a number,,// --- STEP 3: PREPARE OUTPUT ---
+"const igcc = Number(row[getCol(""IGCC"")]) || 0;",,"// Added ""DATE"" into the final summary table header structural mapping"
+"const reason = String(row[getCol(""Basic Reason for IGCC"")] || ""Unknown"").trim();",,"const output = [[""Unique ID"", ""DATE"", ""WEEK"", ""CITY"", ""ITEM_CODE_NEW"", ""ITEM_NAME"", ""Total IGCC"", ""Unique Order Numbers"", ""Reason Summary""]];"
+"let orderRaw = String(row[getCol(""ORDERS"")] || """").trim();",,for (let key in result) {
+"let ordersArray = orderRaw.split("","").map(o => o.trim().replace("".0"", """"));",,const obj = result[key];
+,,const reasonSummary = Object.entries(obj.reasons)
+const key = `${week}|${city}|${itemCode}|${itemName}`;,,".sort((a, b) => b[1] - a[1])"
+,,".map(([r, v]) => `${r} (${v.toFixed(2)})`)"
+if (!result[key]) {,,".join("", "");"
+"result[key] = { week, city, itemCode, itemName, igccSum: 0, ordersSet: new Set(), reasons: {} };",,
+},,const uniqueOrders = Array.from(obj.ordersSet);
+,,// --- DAILY CHANGE: Generate combined Unique ID string using Date (DT) ---
+result[key].igccSum += igcc;,,const uniqueId = `${obj.dt}-${obj.city}-${obj.itemCode}`;
+// --- FIX APPLIED HERE ---,,output.push([
+"// Instead of +1, we add the actual igcc value for that specific reason",,"uniqueId,"
+result[key].reasons[reason] = (result[key].reasons[reason] || 0) + igcc;,,"obj.dt,"
+,,"obj.week,"
+ordersArray.forEach(order => {,,"obj.city,"
+"if (order !== """" && order !== ""null"") result[key].ordersSet.add(order);",,"obj.itemCode,"
+});,,"obj.itemName,"
+},,"obj.igccSum,"
+,,"uniqueOrders.join("", ""),"
+"// --- STEP 3: PREPARE OUTPUT (Added ""Unique ID"", Removed ""Unique Order Count"") ---",,reasonSummary
+"const output = [[""Unique ID"", ""WEEK"", ""CITY"", ""ITEM_CODE_NEW"", ""ITEM_NAME"", ""Total IGCC"", ""Unique Order Numbers"", ""Reason Summary""]];",,]);
+for (let key in result) {,,}
+const obj = result[key];,,
+// Sort reasons by value (highest impact first) and format,,// --- STEP 4: PRECISE INSERTION ---
+const reasonSummary = Object.entries(obj.reasons),,const rowsNeeded = output.length;
+".sort((a, b) => b[1] - a[1])",,const colsNeeded = output[0].length;
+".map(([r, v]) => `${r} (${v.toFixed(2)})`) // Rounding to 2 decimals for clean display",,
+".join("", "");",,"if (outputSheet.getMaxColumns() < colsNeeded) outputSheet.insertColumnsAfter(1, colsNeeded - 1);"
+,,"if (outputSheet.getMaxRows() < rowsNeeded) outputSheet.insertRowsAfter(1, rowsNeeded - 1);"
+const uniqueOrders = Array.from(obj.ordersSet);,,
+// Generate the combined Unique ID string (Week-City-ItemCode),,"const targetRange = outputSheet.getRange(1, 1, rowsNeeded, colsNeeded);"
+const uniqueId = `${obj.week}-${obj.city}-${obj.itemCode}`;,,targetRange.setValues(output);
+// Pushed uniqueId to the front of the row array,,"targetRange.setHorizontalAlignment(""left"");"
+"output.push([uniqueId, obj.week, obj.city, obj.itemCode, obj.itemName, obj.igccSum, uniqueOrders.join("", ""), reasonSummary]);",,"outputSheet.getRange(1, 1, 1, colsNeeded).setFontWeight(""bold"").setBackground(""#EFEFEF"");"
+},,outputSheet.setFrozenRows(1);
+,,
+// --- STEP 4: PRECISE INSERTION ---,,"Logger.log(""✅ Summary updated: Daily calculation configured, Unique ID updated to Date-City-ItemCode, and alignment preserved."");"
+const rowsNeeded = output.length;,,}
+const colsNeeded = output[0].length;,,
+,,function copyDailyrca() {
+"if (outputSheet.getMaxColumns() < colsNeeded) outputSheet.insertColumnsAfter(1, colsNeeded - 1);",,"const sourceSpreadsheetId = ""1k-aIC3c-0MG0ztAFk3jAq1p13JzWdjPCSYDWRDspNDY"";"
+"if (outputSheet.getMaxRows() < rowsNeeded) outputSheet.insertRowsAfter(1, rowsNeeded - 1);",,"const sourceSheetName = ""Item_level_daily"";"
+,,"const targetSpreadsheetId = ""1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk"";"
+// Define target range,,"const targetSheetName = ""Daily-RCA bucket"";"
+"const targetRange = outputSheet.getRange(1, 1, rowsNeeded, colsNeeded);",,const numCols = 10;
+// Set values and align all text to the left side,,
+targetRange.setValues(output);,,const sourceSS = SpreadsheetApp.openById(sourceSpreadsheetId);
+"targetRange.setHorizontalAlignment(""left"");",,const sourceSheet = sourceSS.getSheetByName(sourceSheetName);
+// Header styling,,"if (!sourceSheet) throw new Error(`Source sheet ""${sourceSheetName}"" not found.`);"
+"outputSheet.getRange(1, 1, 1, colsNeeded).setFontWeight(""bold"").setBackground(""#EFEFEF"");",,
+outputSheet.setFrozenRows(1);,,const targetSS = SpreadsheetApp.openById(targetSpreadsheetId);
+,,let targetSheet = targetSS.getSheetByName(targetSheetName);
+"Logger.log(""✅ Summary updated: Added Unique ID column, removed Unique Order Count, and preserved left alignment."");",,if (!targetSheet) targetSheet = targetSS.insertSheet(targetSheetName);
+},,
+,,const lastRow = sourceSheet.getLastRow();
+,,"if (!lastRow || lastRow < 1) { Logger.log(""No data.""); return; }"
+,,
+,,"const data = sourceSheet.getRange(1, 1, lastRow, numCols).getValues();"
+,,targetSheet.clearContents();
+,,"targetSheet.getRange(1, 1, data.length, data[0].length).setValues(data);"
+,,"Logger.log(`✅ copyweeklyrca: Copied ${data.length - 1} rows to ""${targetSheetName}""`);"
+,,}
+,,
+,,
+,,
+,,function copyweeklyrca() {
+,,"const sourceSpreadsheetId = ""1k-aIC3c-0MG0ztAFk3jAq1p13JzWdjPCSYDWRDspNDY"";"
+,,"const sourceSheetName = ""Item_level_weekly"";"
+,,"const targetSpreadsheetId = ""1dnc_Gl1-TL85T8UPkJ6LLbU0VTbd13LlJS1IPR814Sk"";"
+,,"const targetSheetName = ""RCA weekly bucket"";"
+,,const numCols = 10;
+,,
+,,const sourceSS = SpreadsheetApp.openById(sourceSpreadsheetId);
+,,const sourceSheet = sourceSS.getSheetByName(sourceSheetName);
+,,"if (!sourceSheet) throw new Error(`Source sheet ""${sourceSheetName}"" not found.`);"
+,,
+,,const targetSS = SpreadsheetApp.openById(targetSpreadsheetId);
+,,let targetSheet = targetSS.getSheetByName(targetSheetName);
+,,if (!targetSheet) targetSheet = targetSS.insertSheet(targetSheetName);
+,,
+,,const lastRow = sourceSheet.getLastRow();
+,,"if (!lastRow || lastRow < 1) { Logger.log(""No data.""); return; }"
+,,
+,,"const data = sourceSheet.getRange(1, 1, lastRow, numCols).getValues();"
+,,targetSheet.clearContents();
+,,"targetSheet.getRange(1, 1, data.length, data[0].length).setValues(data);"
+,,"Logger.log(`✅ copyweeklyrca: Copied ${data.length - 1} rows to ""${targetSheetName}""`);"
+,,}
+,,
+,,function finalIGCCweeklyRCASummary() {
+,,const ss = SpreadsheetApp.getActiveSpreadsheet();
+,,"const sourceSheet = ss.getSheetByName(""RCA weekly bucket"");"
+,,"const outputSheetName = ""WeeklyRCA-Summary"";"
+,,let outputSheet = ss.getSheetByName(outputSheetName);
+,,
+,,// --- STEP 1: AGGRESSIVE CELL RECOVERY ---
+,,if (outputSheet) {
+,,outputSheet.clear();
+,,const currentMaxRows = outputSheet.getMaxRows();
+,,const currentMaxCols = outputSheet.getMaxColumns();
+,,"if (currentMaxRows > 1) outputSheet.deleteRows(1, currentMaxRows - 1);"
+,,"if (currentMaxCols > 1) outputSheet.deleteColumns(1, currentMaxCols - 1);"
+,,} else {
+,,outputSheet = ss.insertSheet(outputSheetName);
+,,}
+,,
+,,// --- STEP 2: DATA PROCESSING ---
+,,const data = sourceSheet.getDataRange().getValues();
+,,if (data.length < 2) return;
+,,
+,,const headers = data[0];
+,,const colIndex = {};
+,,"headers.forEach((h, i) => colIndex[h.trim()] = i);"
+,,
+,,const getCol = (name) => colIndex[name] !== undefined ? colIndex[name] : -1;
+,,const result = {};
+,,
+,,for (let i = 1; i < data.length; i++) {
+,,const row = data[i];
+,,"const week = row[getCol(""WEEK"")];"
+,,if (!week && week !== 0) continue;
+,,
+,,"const city = row[getCol(""CITY"")];"
+,,"const itemCode = row[getCol(""ITEM_CODE_NEW"")];"
+,,"const itemName = row[getCol(""ITEM_NAME"")];"
+,,// Ensure IGCC is treated as a number
+,,"const igcc = Number(row[getCol(""IGCC"")]) || 0;"
+,,"const reason = String(row[getCol(""Basic Reason for IGCC"")] || ""Unknown"").trim();"
+,,"let orderRaw = String(row[getCol(""ORDERS"")] || """").trim();"
+,,"let ordersArray = orderRaw.split("","").map(o => o.trim().replace("".0"", """"));"
+,,
+,,const key = `${week}|${city}|${itemCode}|${itemName}`;
+,,
+,,if (!result[key]) {
+,,"result[key] = { week, city, itemCode, itemName, igccSum: 0, ordersSet: new Set(), reasons: {} };"
+,,}
+,,
+,,result[key].igccSum += igcc;
+,,// --- FIX APPLIED HERE ---
+,,"// Instead of +1, we add the actual igcc value for that specific reason"
+,,result[key].reasons[reason] = (result[key].reasons[reason] || 0) + igcc;
+,,
+,,ordersArray.forEach(order => {
+,,"if (order !== """" && order !== ""null"") result[key].ordersSet.add(order);"
+,,});
+,,}
+,,
+,,"// --- STEP 3: PREPARE OUTPUT (Added ""Unique ID"", Removed ""Unique Order Count"") ---"
+,,"const output = [[""Unique ID"", ""WEEK"", ""CITY"", ""ITEM_CODE_NEW"", ""ITEM_NAME"", ""Total IGCC"", ""Unique Order Numbers"", ""Reason Summary""]];"
+,,for (let key in result) {
+,,const obj = result[key];
+,,// Sort reasons by value (highest impact first) and format
+,,const reasonSummary = Object.entries(obj.reasons)
+,,".sort((a, b) => b[1] - a[1])"
+,,".map(([r, v]) => `${r} (${v.toFixed(2)})`) // Rounding to 2 decimals for clean display"
+,,".join("", "");"
+,,
+,,const uniqueOrders = Array.from(obj.ordersSet);
+,,// Generate the combined Unique ID string (Week-City-ItemCode)
+,,const uniqueId = `${obj.week}-${obj.city}-${obj.itemCode}`;
+,,// Pushed uniqueId to the front of the row array
+,,"output.push([uniqueId, obj.week, obj.city, obj.itemCode, obj.itemName, obj.igccSum, uniqueOrders.join("", ""), reasonSummary]);"
+,,}
+,,
+,,// --- STEP 4: PRECISE INSERTION ---
+,,const rowsNeeded = output.length;
+,,const colsNeeded = output[0].length;
+,,
+,,"if (outputSheet.getMaxColumns() < colsNeeded) outputSheet.insertColumnsAfter(1, colsNeeded - 1);"
+,,"if (outputSheet.getMaxRows() < rowsNeeded) outputSheet.insertRowsAfter(1, rowsNeeded - 1);"
+,,
+,,// Define target range
+,,"const targetRange = outputSheet.getRange(1, 1, rowsNeeded, colsNeeded);"
+,,// Set values and align all text to the left side
+,,targetRange.setValues(output);
+,,"targetRange.setHorizontalAlignment(""left"");"
+,,// Header styling
+,,"outputSheet.getRange(1, 1, 1, colsNeeded).setFontWeight(""bold"").setBackground(""#EFEFEF"");"
+,,outputSheet.setFrozenRows(1);
+,,
+,,"Logger.log(""✅ Summary updated: Added Unique ID column, removed Unique Order Count, and preserved left alignment."");"
+,,}
