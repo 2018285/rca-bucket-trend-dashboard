@@ -801,6 +801,10 @@ Chart.defaults.font.size = 12;
 // ─────────────────────────────────────────────
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
 let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
+
+// Cache-bust every CSV fetch so browsers/CDN never serve stale data after a refresh
+const CACHE_BUST = Date.now();
+function csvUrl(name) { return `${name}?v=${CACHE_BUST}`; }
 let rawItemRows = [];       // raw rows from Item_level_weekly.csv
 let storeWeeklyRows = [];   // {week, city, storeId, spoc, orders, igcc}
 let storeDailyRows = [];    // {date, week, city, storeId, spoc, orders, igcc}
@@ -901,7 +905,7 @@ async function loadData() {
 
   // Load spoc_level (small, fast)
   await new Promise((resolve, reject) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Spoc_level.csv', {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Spoc_level.csv'), {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -928,7 +932,7 @@ async function loadData() {
   const cubeMap = {};
 
   await new Promise((resolve, reject) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_weekly.csv', {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Item_level_weekly.csv'), {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -1002,7 +1006,7 @@ async function loadStoreTrendData() {
   };
 
   const weeklyP = new Promise((resolve) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Store_L1_wk.csv', {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Store_L1_wk.csv'), {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         storeWeeklyRows = data.map(row => ({
@@ -1020,7 +1024,7 @@ async function loadStoreTrendData() {
   });
 
   const dailyP = new Promise((resolve) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Store_L1_daily.csv', {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Store_L1_daily.csv'), {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         storeDailyRows = data.map(row => ({
@@ -1039,7 +1043,7 @@ async function loadStoreTrendData() {
   });
 
   const podP = new Promise((resolve) => {
-    Papa.parse('fnv_pod_sales_all.csv', {
+    Papa.parse(csvUrl('fnv_pod_sales_all.csv'), {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         data.forEach(row => {
@@ -3477,7 +3481,7 @@ async function loadDailyData() {
     `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">Loading daily data…</td></tr>`;
 
   await new Promise((resolve, reject) => {
-    Papa.parse('IGCC-RCA-Appsheet Summary - Item_level_daily.csv', {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Item_level_daily.csv'), {
       download: true, header: true, skipEmptyLines: true,
       complete: ({ data }) => {
         const MMAP={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
