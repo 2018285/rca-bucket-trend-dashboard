@@ -822,7 +822,7 @@ const CITY_LIST_URL = 'Weekly RCA bucket sumarry - City List.csv';
 async function loadCityTiers() {
   try {
     const text = await new Promise((resolve, reject) => {
-      Papa.parse(CITY_LIST_URL, {
+      Papa.parse(csvUrl(CITY_LIST_URL), {
         download: true, header: true, skipEmptyLines: true,
         complete: ({ data }) => resolve(data),
         error: reject
@@ -3151,7 +3151,7 @@ document.querySelectorAll('.item-subtab-btn').forEach(btn => {
 // ─────────────────────────────────────────────
 // WEEKLY SUMMARY — loads from Google Sheet CSV export
 // ─────────────────────────────────────────────
-const WS_CSV_URL  = 'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv';
+const WS_CSV_NAME  = 'Weekly RCA bucket sumarry - WeeklyRCA-Summary (2).csv';
 
 let wsRawRows  = [];  // parsed rows from weekly CSV
 let wsState    = { inited: false, sortCol: 'Total IGCC', sortDir: 'desc', page: 0, filtered: [] };
@@ -3178,7 +3178,7 @@ async function loadWeeklySummary() {
 
   try {
     await new Promise((resolve, reject) => {
-      Papa.parse(WS_CSV_URL, {
+      Papa.parse(csvUrl(WS_CSV_NAME), {
         download: true,
         header: true,
         skipEmptyLines: true,
