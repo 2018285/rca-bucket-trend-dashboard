@@ -800,7 +800,8 @@ Chart.defaults.font.size = 12;
 // DATA STORE
 // ─────────────────────────────────────────────
 let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
-let unicOrdersMap = {};     // unicOrdersMap[week][city] = orders_total
+let unicOrdersMap = {};     // unicOrdersMap['week|city|item'] = unique orders for that item
+let cityUnicMap = {};       // cityUnicMap['week|city'] = sum of deduped item orders (category incident % denominator)
 
 // Cache-bust every CSV fetch so browsers/CDN never serve stale data after a refresh
 const CACHE_BUST = Date.now();
@@ -900,33 +901,8 @@ async function loadData() {
   // Load city tier list from Google Sheet in parallel with CSV data
   loadCityTiers();
 
-  setLoadText('Loading UNIC Orders (Spoc_level.csv)...');
-  setProgress(10);
-
-  // Load spoc_level (small, fast)
-  await new Promise((resolve, reject) => {
-    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Spoc_level.csv'), {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: ({ data }) => {
-        data.forEach(row => {
-          const weekVal = row.WEEK || row['﻿WEEK'] || '';
-          const w = String(weekVal).trim();
-          const c = String(row.CITY || '').trim();
-          const orders = parseInt(row.ORDERS_TOTAL, 10) || 0;
-          if (!w || !c) return;
-          if (!unicOrdersMap[w]) unicOrdersMap[w] = {};
-          unicOrdersMap[w][c] = Math.max(unicOrdersMap[w][c] || 0, orders);
-        });
-        resolve();
-      },
-      error: reject
-    });
-  });
-
   setLoadText('Loading weekly data (this may take 5–10 seconds)...');
-  setProgress(35);
+  setProgress(10);
 
   // Load weekly CSV fully then aggregate
   const cubeMap = {};
@@ -948,10 +924,18 @@ async function loadData() {
           const weekVal = row.WEEK || row['﻿WEEK'] || '';
           const week   = String(weekVal).trim();
           const city   = String(row.CITY || '').trim();
+          const item   = String(row.ITEM_CODE_NEW || '').trim();
           const bucket = String(row['Basic Reason for IGCC'] || '').trim() || '<NA>';
           const spoc   = String(row.SPOC || '').trim() || '<NA>';
           const igcc   = parseInt(row.IGCC, 10) || 0;
+          const orders = parseInt(row.ORDERS, 10) || 0;
           if (!week || !city) return;
+          // UNIC orders = per-item unique orders, deduped per week+city+item
+          // (ORDERS repeats across bucket/SPOC rows for the same item)
+          if (item && orders) {
+            const ok = `${week}|${city}|${item}`;
+            if (orders > (unicOrdersMap[ok] || 0)) unicOrdersMap[ok] = orders;
+          }
           const key = `${week}|${city}|${bucket}|${spoc}`;
           if (!cubeMap[key]) {
             cubeMap[key] = { week, city, bucket, spoc, igcc: 0 };
@@ -977,6 +961,13 @@ async function loadData() {
   });
 
   aggregatedCube = Object.values(cubeMap);
+  // Build week+city denominator: sum of per-item unique orders (matches source "incident %")
+  cityUnicMap = {};
+  Object.keys(unicOrdersMap).forEach(k => {
+    const [w, c] = k.split('|');
+    const wk = `${w}|${c}`;
+    cityUnicMap[wk] = (cityUnicMap[wk] || 0) + unicOrdersMap[k];
+  });
   setProgress(90);
   setLoadText(`Ready — ${aggregatedCube.length.toLocaleString()} aggregated combinations`);
 
@@ -1192,6 +1183,7 @@ async function refreshAllData() {
   // Reset data arrays
   aggregatedCube = [];
   unicOrdersMap  = {};
+  cityUnicMap    = {};
   rawItemRows    = [];
   storeWeeklyRows = [];
   storeDailyRows  = [];
@@ -1352,7 +1344,7 @@ function computeAggregates(rows) {
   rows.forEach(r => {
     const key = `${r.week}|${r.city}`;
     if (!weekCityUnic[key]) {
-      weekCityUnic[key] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      weekCityUnic[key] = cityUnicMap[key] || 0;
     }
   });
   const totalUNIC = Object.values(weekCityUnic).reduce((s,v) => s+v, 0);
@@ -1366,7 +1358,7 @@ function computeAggregates(rows) {
     byWeek[r.week].igcc += r.igcc;
     if (!byWeek[r.week].cities[r.city]) {
       byWeek[r.week].cities[r.city] = 1;
-      byWeek[r.week].unic += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      byWeek[r.week].unic += cityUnicMap[`${r.week}|${r.city}`] || 0;
     }
   });
 
@@ -1375,7 +1367,7 @@ function computeAggregates(rows) {
   rows.forEach(r => {
     if (!byWeekCity[r.week]) byWeekCity[r.week] = {};
     if (!byWeekCity[r.week][r.city]) {
-      byWeekCity[r.week][r.city] = { igcc:0, unic: (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0 };
+      byWeekCity[r.week][r.city] = { igcc:0, unic: cityUnicMap[`${r.week}|${r.city}`] || 0 };
     }
     byWeekCity[r.week][r.city].igcc += r.igcc;
   });
@@ -1745,11 +1737,11 @@ function renderCityWeekTrend(rows) {
 
   const weeks = [...new Set(rows.map(r => r.week))].sort((a,b) => +a - +b);
 
-  // unic per week+city (from unicOrdersMap)
+  // unic per week+city (sum of deduped per-item orders)
   const wcUnic = {};
   rows.forEach(r => {
     const k = `${r.week}|${r.city}`;
-    if (!wcUnic[k]) wcUnic[k] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    if (!wcUnic[k]) wcUnic[k] = cityUnicMap[k] || 0;
   });
 
   // igcc per week+city
@@ -2398,6 +2390,7 @@ function renderItemWeekTrend(cubeRows) {
 
   const iwIGCC = {}, iwOrders = {}, ibwIGCC = {}, iwsIGCC = {};
   const itemName = {}, itemTotal = {};
+  const seenOrdersKey = {};
   rows.forEach(r => {
     const item = r.ITEM_CODE_NEW;
     if (!item) return;
@@ -2405,7 +2398,12 @@ function renderItemWeekTrend(cubeRows) {
     itemTotal[item] = (itemTotal[item] || 0) + r['Total IGCC'];
     const kiw = `${item}|${r.WEEK}`;
     iwIGCC[kiw]   = (iwIGCC[kiw]   || 0) + r['Total IGCC'];
-    iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    // orders repeat on duplicate week+city+item rows — count once
+    const ok = `${r.WEEK}|${r.CITY}|${item}`;
+    if (!(ok in seenOrdersKey)) {
+      seenOrdersKey[ok] = 1;
+      iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    }
     r._buckets.forEach(b => {
       const kibw = `${item}|${r.WEEK}|${b.bucket}`;
       ibwIGCC[kibw] = (ibwIGCC[kibw] || 0) + b.count;
@@ -2422,10 +2420,15 @@ function renderItemWeekTrend(cubeRows) {
   });
 
   const weekTotals = {};
+  const seenWO = {};
   rows.forEach(r => {
     if (!weekTotals[r.WEEK]) weekTotals[r.WEEK] = { igcc: 0, orders: 0 };
-    weekTotals[r.WEEK].igcc   += r['Total IGCC'];
-    weekTotals[r.WEEK].orders += r['Unique Order Numbers'];
+    weekTotals[r.WEEK].igcc += r['Total IGCC'];
+    const ok = `${r.WEEK}|${r.CITY}|${r.ITEM_CODE_NEW}`;
+    if (!(ok in seenWO)) {
+      seenWO[ok] = 1;
+      weekTotals[r.WEEK].orders += r['Unique Order Numbers'];
+    }
   });
 
   const allItems = Object.keys(itemTotal).sort((a, b) => itemTotal[b] - itemTotal[a]);
@@ -2627,6 +2630,7 @@ function downloadItemTrendCSV() {
 
   const iwIGCC = {}, iwOrders = {}, ibwIGCC = {};
   const itemName = {}, itemTotal = {};
+  const seenOrdersKey = {};
   rows.forEach(r => {
     const item = r.ITEM_CODE_NEW;
     if (!item) return;
@@ -2634,7 +2638,11 @@ function downloadItemTrendCSV() {
     itemTotal[item] = (itemTotal[item] || 0) + r['Total IGCC'];
     const kiw = `${item}|${r.WEEK}`;
     iwIGCC[kiw]   = (iwIGCC[kiw]   || 0) + r['Total IGCC'];
-    iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    const ok = `${r.WEEK}|${r.CITY}|${item}`;
+    if (!(ok in seenOrdersKey)) {
+      seenOrdersKey[ok] = 1;
+      iwOrders[kiw] = (iwOrders[kiw] || 0) + r['Unique Order Numbers'];
+    }
     r._buckets.forEach(b => {
       const kibw = `${item}|${r.WEEK}|${b.bucket}`;
       ibwIGCC[kibw] = (ibwIGCC[kibw] || 0) + b.count;
@@ -2706,7 +2714,7 @@ function buildCitySpocData(rows) {
     const key = `${r.week}|${r.city}`;
     if (!seenWC[key]) {
       seenWC[key] = 1;
-      cityUnic[r.city] += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      cityUnic[r.city] += cityUnicMap[key] || 0;
     }
   });
 
@@ -2886,7 +2894,7 @@ function renderPivotTable(rows) {
     if (!weekUnic[r.week]) weekUnic[r.week] = { cities: new Set(), total: 0 };
     if (!weekUnic[r.week].cities.has(r.city)) {
       weekUnic[r.week].cities.add(r.city);
-      weekUnic[r.week].total += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      weekUnic[r.week].total += cityUnicMap[`${r.week}|${r.city}`] || 0;
     }
   });
 
@@ -3015,7 +3023,7 @@ function renderPivotTable(rows) {
 // ─────────────────────────────────────────────
 function downloadCSV() {
   const rows = getFilteredRows().map(r => {
-    const unic = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    const unic = cityUnicMap[`${r.week}|${r.city}`] || 0;
     const rate = unic > 0 ? (r.igcc / unic * 100).toFixed(4) : '';
     return { Week: r.week, City: r.city, 'RCA Bucket': r.bucket, SPOC: r.spoc, IGCC: r.igcc, 'UNIC Orders': unic, 'IGCC Rate %': rate };
   });
@@ -3037,7 +3045,7 @@ function downloadPivotCSV() {
     if (!weekUnic[r.week]) weekUnic[r.week] = { cities: new Set(), total: 0 };
     if (!weekUnic[r.week].cities.has(r.city)) {
       weekUnic[r.week].cities.add(r.city);
-      weekUnic[r.week].total += (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+      weekUnic[r.week].total += cityUnicMap[`${r.week}|${r.city}`] || 0;
     }
   });
   const pivot = {};
@@ -3072,7 +3080,7 @@ function downloadCwtCSV() {
   const wcUnic = {};
   rows.forEach(r => {
     const k = `${r.week}|${r.city}`;
-    if (!wcUnic[k]) wcUnic[k] = (unicOrdersMap[r.week] && unicOrdersMap[r.week][r.city]) || 0;
+    if (!wcUnic[k]) wcUnic[k] = cityUnicMap[k] || 0;
   });
 
   // group by current Group By toggle (bucket or spoc)
@@ -3508,6 +3516,14 @@ async function loadDailyData() {
             _buckets:      (parseReasonSummary(reason).length ? parseReasonSummary(reason) : (reason ? [{bucket: reason, count: 1}] : []))
           };
         }).filter(r => r.DT && r.CITY);
+        // ORDERS repeats across bucket rows for the same date+city+item —
+        // mark duplicates so rate sums count it once (display still shows it)
+        const seenOrders = {};
+        dailyRows.forEach(r => {
+          const k = `${r.DT}|${r.CITY}|${r.ITEM_CODE_NEW}`;
+          r._dupOrders = k in seenOrders;
+          seenOrders[k] = 1;
+        });
         resolve();
       },
       error: reject
@@ -3641,7 +3657,7 @@ function applyItemFilters() {
 function renderItemKPIs() {
   const rows = itemState.filtered;
   const totalIGCC   = rows.reduce((s,r) => s + r.IGCC, 0);
-  const totalOrders = rows.reduce((s,r) => s + r.ORDERS, 0);
+  const totalOrders = rows.reduce((s,r) => s + (r._dupOrders ? 0 : r.ORDERS), 0);
   const rate = totalOrders > 0 ? (totalIGCC / totalOrders * 100).toFixed(3) + '%' : '—';
   const itemIGCC = {}, itemName = {};
   rows.forEach(r => {
