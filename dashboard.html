@@ -799,14 +799,12 @@ Chart.defaults.font.size = 12;
 // ─────────────────────────────────────────────
 // DATA STORE
 // ─────────────────────────────────────────────
-let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}
-let unicOrdersMap = {};     // unicOrdersMap['week|city|item'] = unique orders for that item
-let cityUnicMap = {};       // cityUnicMap['week|city'] = sum of deduped item orders (category incident % denominator)
+let aggregatedCube = [];    // {week, city, bucket, spoc, igcc}  (from Spoc_L2_daily)
+let cityUnicMap = {};       // cityUnicMap['week|city'] = sum of city-day ORDERS_TOTAL (IGCC% denominator)
 
 // Cache-bust every CSV fetch so browsers/CDN never serve stale data after a refresh
 const CACHE_BUST = Date.now();
 function csvUrl(name) { return `${name}?v=${CACHE_BUST}`; }
-let rawItemRows = [];       // raw rows from Item_level_weekly.csv
 let storeWeeklyRows = [];   // {week, city, storeId, spoc, orders, igcc}
 let storeDailyRows = [];    // {date, week, city, storeId, spoc, orders, igcc}
 let podNameMap = {};        // STORE_ID -> POD Name (from fnv_pod_sales_all.csv)
@@ -904,11 +902,12 @@ async function loadData() {
   setLoadText('Loading weekly data (this may take 5–10 seconds)...');
   setProgress(10);
 
-  // Load weekly CSV fully then aggregate
+  // Load Spoc_L2_daily — the source sheet's IGCC% basis:
+  // IGCC per week+city+bucket+spoc, denominator = city-day ORDERS_TOTAL (deduped)
   const cubeMap = {};
 
   await new Promise((resolve, reject) => {
-    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Item_level_weekly.csv'), {
+    Papa.parse(csvUrl('IGCC-RCA-Appsheet Summary - Spoc_L2_daily.csv'), {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -919,55 +918,41 @@ async function loadData() {
         }
         setLoadText(`Aggregating ${data.length.toLocaleString()} rows...`);
         setProgress(70);
+        const dayOrders = {};
         data.forEach(row => {
           // Handle BOM on first column header
           const weekVal = row.WEEK || row['﻿WEEK'] || '';
           const week   = String(weekVal).trim();
           const city   = String(row.CITY || '').trim();
-          const item   = String(row.ITEM_CODE_NEW || '').trim();
           const bucket = String(row['Basic Reason for IGCC'] || '').trim() || '<NA>';
           const spoc   = String(row.SPOC || '').trim() || '<NA>';
           const igcc   = parseInt(row.IGCC, 10) || 0;
-          const orders = parseInt(row.ORDERS, 10) || 0;
           if (!week || !city) return;
-          // UNIC orders = per-item unique orders, deduped per week+city+item
-          // (ORDERS repeats across bucket/SPOC rows for the same item)
-          if (item && orders) {
-            const ok = `${week}|${city}|${item}`;
-            if (orders > (unicOrdersMap[ok] || 0)) unicOrdersMap[ok] = orders;
+          const dt = String(row.DT || '').trim();
+          if (dt) {
+            const dk = `${week}|${dt}|${city}`;
+            const o = parseInt(row.ORDERS_TOTAL, 10) || 0;
+            if (o > (dayOrders[dk] || 0)) dayOrders[dk] = o;
           }
           const key = `${week}|${city}|${bucket}|${spoc}`;
           if (!cubeMap[key]) {
             cubeMap[key] = { week, city, bucket, spoc, igcc: 0 };
           }
           cubeMap[key].igcc += igcc;
-          // store raw row for item tab
-          rawItemRows.push({
-            WEEK: week,
-            CITY: city,
-            ITEM_CODE_NEW: String(row.ITEM_CODE_NEW || '').trim(),
-            ITEM_NAME: String(row.ITEM_NAME || '').trim(),
-            'Basic Reason for IGCC': bucket,
-            SPOC: spoc,
-            IGCC: igcc,
-            ORDERS: parseInt(row.ORDERS, 10) || 0,
-            'inc_%': String(row['inc_%'] || '').trim()
-          });
+        });
+        // week+city denominator = sum of city-day orders
+        Object.keys(dayOrders).forEach(k => {
+          const [w, dt, c] = k.split('|');
+          const wk = `${w}|${c}`;
+          cityUnicMap[wk] = (cityUnicMap[wk] || 0) + dayOrders[k];
         });
         resolve();
       },
-      error: (err) => reject(new Error(err.message || 'Failed to load weekly CSV'))
+      error: (err) => reject(new Error(err.message || 'Failed to load Spoc_L2_daily CSV'))
     });
   });
 
   aggregatedCube = Object.values(cubeMap);
-  // Build week+city denominator: sum of per-item unique orders (matches source "incident %")
-  cityUnicMap = {};
-  Object.keys(unicOrdersMap).forEach(k => {
-    const [w, c] = k.split('|');
-    const wk = `${w}|${c}`;
-    cityUnicMap[wk] = (cityUnicMap[wk] || 0) + unicOrdersMap[k];
-  });
   setProgress(90);
   setLoadText(`Ready — ${aggregatedCube.length.toLocaleString()} aggregated combinations`);
 
@@ -1182,9 +1167,7 @@ async function refreshAllData() {
 
   // Reset data arrays
   aggregatedCube = [];
-  unicOrdersMap  = {};
   cityUnicMap    = {};
-  rawItemRows    = [];
   storeWeeklyRows = [];
   storeDailyRows  = [];
   podNameMap      = {};

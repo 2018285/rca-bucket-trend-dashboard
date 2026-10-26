@@ -48,6 +48,8 @@ FILE_MAP = {
         'IGCC-RCA-Appsheet Summary - Store_L1_wk.csv',
     'IGCC_IGCC-RCA-Appsheet Summary_Store_L1_daily':
         'IGCC-RCA-Appsheet Summary - Store_L1_daily.csv',
+    'IGCC_IGCC-RCA-Appsheet Summary_ Spoc_L2_daily':
+        'IGCC-RCA-Appsheet Summary - Spoc_L2_daily.csv',
 }
 
 # ── Logging ───────────────────────────────────────────────────────────────────
